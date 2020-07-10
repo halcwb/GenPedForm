@@ -1,12 +1,15 @@
 group Client
-FSharp.Core
-Fable.Core
-Fable.Elmish.Debugger
-Fable.Elmish.React
-Fable.Elmish.HMR
-Thoth.Fetch
-Feliz
-Feliz.ElmishComponents
-Feliz.MaterialUI
-Fable.MaterialUI.Icons
-Fable.MaterialUI.MaterialDesignIcons
+    FSharp.Core
+    Fable.Core
+    Fable.Elmish.Debugger
+    Fable.Elmish.React
+    Fable.Elmish.HMR
+    Thoth.Fetch
+    Thoth.Elmish.Debouncer
+    Fable.FontAwesome.Free
+    Fable.Browser.Navigator
+    Feliz
+    Feliz.MaterialUI
+    Fable.MaterialUI.Icons
+    Feliz.UseElmish
+    Feliz.MaterialUI.Pickers

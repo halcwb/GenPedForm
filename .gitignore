@@ -17,6 +17,10 @@
 # Add fsx files
 !*.fsx
 
+# Add package.json and webpackconfig
+!package.json
+!webpack.config.js
+
 # Add command and batch files
 !*.cmd
 !*.sh
@@ -24,6 +28,10 @@
 # ignore release and publish nuget commands
 release.cmd
 publishnuget.cmd
+
+# Add dotnet tool config
+!/.config/
+!/.config/*.json
 
 # Add Docker files
 !Dockerfile
@@ -69,6 +77,8 @@ publishnuget.cmd
 !/src/Server/Scripts/resources/*.csv
 !/src/Client/
 !/src/Client/public/*.*
+!/src/Client/index.html
+!/src/Client/style.scss
 
 # Add test files
 

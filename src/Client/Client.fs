@@ -32,8 +32,8 @@ type Msg =
     | ProductsLoaded of Product []
     | DosesLoaded of Dose []
 
-let fetchProducts () = Fetch.fetchAs<Product[]> "/api/products"
-let fetchDoses () = Fetch.fetchAs<Dose[]> "/api/doses"
+let fetchProducts () = Fetch.fetchAs<Product[], Product []> "/api/products"
+let fetchDoses () = Fetch.fetchAs<Dose [], Dose []> "/api/doses"
 
 // defines the initial state and initial command (= side-effect) of the application
 let init () : Model * Cmd<Msg> =

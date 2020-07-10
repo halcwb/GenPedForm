@@ -1,31 +1,34 @@
 group Server
     source https://api.nuget.org/v3/index.json
-    framework: netcoreapp3.0
+    framework: netcoreapp3.1
     storage: none
 
     nuget FSharp.Core
-nuget FSharp.Data
+    nuget FSharp.Data
     nuget Saturn
     nuget Microsoft.AspNetCore.Authentication.JwtBearer 3.0.2 // pin for netcoreapp30
     nuget Thoth.Json.Giraffe
 
 group Client
     source https://api.nuget.org/v3/index.json
-    framework: netstandard2.0
+    framework: netstandard2.1
     storage: none
 
-    nuget Fable.Core ~> 3
-    nuget Fable.Elmish ~> 3
-    nuget Fable.Elmish.Debugger ~> 3
-    nuget Fable.Elmish.HMR ~> 4
-    nuget Fable.Elmish.React ~> 3
-nuget Fable.MaterialUI.Icons
-nuget Fable.MaterialUI.MaterialDesignIcons
-nuget Feliz
-nuget Feliz.ElmishComponents
-nuget Feliz.MaterialUI
-    nuget Thoth.Fetch ~> 1
-    nuget Fable.React ~> 5
+    nuget Fable.Core
+    nuget Fable.Elmish
+    nuget Fable.Elmish.Debugger
+    nuget Fable.Elmish.HMR
+    nuget Fable.Elmish.React
+    nuget Thoth.Fetch
+    nuget Thoth.Elmish.Debouncer
+    nuget Fable.React
+    nuget Fable.FontAwesome.Free
+    nuget Fable.MaterialUI.Icons
+    nuget Fable.Browser.Navigator
+    nuget Feliz
+    nuget Feliz.MaterialUI
+    nuget Feliz.UseElmish
+    nuget Feliz.MaterialUI.Pickers
 
 group Build
     source https://api.nuget.org/v3/index.json

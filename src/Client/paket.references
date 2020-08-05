@@ -9,7 +9,9 @@ group Client
     Fable.FontAwesome.Free
     Fable.Browser.Navigator
     Feliz
+    Feliz.Markdown
     Feliz.MaterialUI
     Fable.MaterialUI.Icons
     Feliz.UseElmish
     Feliz.MaterialUI.Pickers
+    Fable.Remoting.Client

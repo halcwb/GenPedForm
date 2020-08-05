@@ -19,6 +19,12 @@
       "commands": [
         "femto"
       ]
+    },
+    "fantomas-tool": {
+      "version": "3.3.0",
+      "commands": [
+        "fantomas"
+      ]
     }
   }
 }

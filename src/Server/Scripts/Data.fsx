@@ -1,6 +1,6 @@
 //#load "../../../.paket/load/netstandard2.1/Server/server.group.fsx"
-#r "C:\\Users\\halcw\\.nuget\\packages\\fsharp.data\\3.3.3\\lib\\netstandard2.0\\FSharp.Data.dll"
-
+//#r "C:\\Users\\halcw\\.nuget\\packages\\fsharp.data\\3.3.3\\lib\\netstandard2.1\\FSharp.Data.dll"
+#r "C:\\Users\\cbollen\\.nuget\\packages\\fsharp.data\\3.3.3\\lib\\netstandard2.0\\FSharp.Data.dll" 
 #load "../../Shared/Shared.fs"
 
 open System

@@ -1,0 +1,432 @@
+﻿module Doses
+
+open System
+
+module Queries =
+
+    let getDoseLatest = "SELECT * FROM [dbo].[GetConfigMedDiscDoseLatest] ()"
+    let getProductLatest = "SELECT * FROM [dbo].[GetConfigMedDiscLatest] ()"
+
+open Types
+open Lib
+open Utils
+
+
+let (|Regex|_|) pattern input =
+    let m = (String.regex pattern).Match(input) // Regex.Match(input, pattern)
+    if m.Success then 
+        Some(List.tail [ for g in m.Groups -> g.Value ])
+    else None
+
+
+let parseFreq s =
+    match s with
+    | Regex @"(antenoctum)" f -> f
+    | Regex @"(\d+)(?: x / )(dag)" f -> f
+    | Regex @"(\d+)(?: x / )(week)" f -> f
+    | Regex @"(\d+)(?: x / )(\d+)(?: )(uur)" f -> f
+    | Regex @"(\d+)(?: x / )(\d+)(?: )(dagen)" f -> f
+    | Regex @"(\d+)(?: x / )(\d+)(?: )(weken)" f -> f
+    | Regex @"(\d+)(?: x / )(\d+)(?: )(maand)" f -> f
+    | _ -> []
+    |> function 
+    | [f; u] -> 
+        { 
+            Count = f |> Int32.parse
+            Time = (1, u)
+        }
+        |> Some
+    | [f; c; u] -> 
+        { 
+            Count = f |> Int32.parse
+            Time = (c |> Int32.parse, u)
+        }
+        |> Some
+    | _ -> None
+    
+
+let getProducts connString =
+    connString
+    |> Sql.connect
+    |> Sql.query Queries.getProductLatest
+    |> Sql.execute (fun r ->
+        let optStr c = r.stringOrNone c |> Option.defaultValue ""
+        let optDbl c = r.doubleOrNone c |> Option.defaultValue 0.
+        {
+            GPK = r.intOrNone "GPK" |> Option.defaultValue 0
+            ATC = optStr "ATC"
+            MainGroup = optStr "MainGroup"
+            SubGroup = optStr "SubGroup"
+            Generic = optStr "Generic"
+            GenericLabel = optStr "Label"
+            ProductLabel = optStr "Product"
+            Shape = optStr "Shape"
+            Routes = 
+                r.string  "Routes"
+                |> String.split "||"
+            Concentration = optDbl "GenericQuantity"
+            Unit = optStr "GenericUnit"
+            Multiple = optDbl "MultipleQuantity"
+            MultipleUnit = optStr "MultipleUnit"
+            HasSolution = r.bool "HasSolutions"
+            IsInStock = r.bool "IsActive"
+            Doses = []
+        } 
+    )
+    |> function 
+    | Ok ps -> ps
+    | _ -> []
+
+
+let getDoses connString : Dose list =
+    connString
+    |> Sql.connect
+    |> Sql.query Queries.getDoseLatest
+    |> Sql.execute (fun r ->
+        let optStr c = r.stringOrNone c |> Option.defaultValue ""
+        let dose s = 
+            let perKg = r.bool "IsDosePerKg"
+            let perM2 = r.bool "IsDosePerM2"
+
+            match s |> r.doubleOrNone with
+            | Some d -> 
+                if d = 0. then None
+                else
+                    match perKg, perM2 with
+                    | true, false -> d |> QuantityPerKg 
+                    | false, true -> d |> QuantityPerM2 
+                    | _, _ -> d |> Quantity
+                    |> Some
+            | None -> None
+
+        let doubleOrNone c = 
+            r.doubleOrNone c
+            |> Option.bind (fun v -> if v = 0. then None else Some v)
+
+        let intOrNone (c : string) = 
+            r.intOrNone c
+            |> Option.bind (fun v -> if v = 0 then None else Some v)
+
+        {
+            Generic = optStr "Generic"
+            Shape = optStr "Shape"
+            Route = optStr "Route"
+            Indication = optStr "Indication"
+            Specialty = ""
+            Gender = Unknown (optStr "Gender")
+            MinAgeMo = doubleOrNone "MinAge"
+            MaxAgeMo = doubleOrNone "MaxAge"
+            MinWeightKg = doubleOrNone "MinWeight"
+            MaxWeightKg = doubleOrNone "MaxWeight"
+            MinGestAgeDays = intOrNone "MinGestAge"
+            MaxGestAgeDays = intOrNone "MaxGestAge"
+            MinPMAgeDays = intOrNone "MinPMAge"
+            MaxPMAgeDays = intOrNone "MaxPMAge"
+            Freqs = 
+                optStr "Frequencies" 
+                |> String.split "||"
+                |> List.map parseFreq
+                |> List.filter Option.isSome
+                |> List.map Option.get
+            Unit = optStr "DoseUnit"
+            NormDose = dose "NormDose"
+            MinDose = dose "MinDose"
+            MaxDose = dose "MaxDose"
+            AbsMaxDose = 
+                r.doubleOrNone "AbsMaxDose" 
+                |> Option.bind (fun v -> 
+                    if v = 0. then None
+                    else v |> Quantity |> Some
+                )
+            MaxPerDose = 
+                r.doubleOrNone "MaxPerDose" 
+                |> Option.bind (fun v -> 
+                    if v = 0. then None
+                    else v |> Quantity |> Some
+                )
+            Products = []
+        }
+    )
+    |> function 
+    | Ok ds ->
+        let products = getProducts connString
+        ds
+        |> List.map (fun d ->
+            { d with
+                Products = 
+                    products
+                    |> List.filter (fun p ->
+                        p.Generic = d.Generic &&
+                        p.Shape = d.Shape &&
+                        p.Routes |> List.exists ((=) d.Route)
+                    )
+                    |> List.map (fun p ->
+                        {
+                            p with 
+                                Doses = 
+                                    ds 
+                                    |> List.filter (fun d ->
+                                        p.Generic = d.Generic &&
+                                        p.Shape = d.Shape &&
+                                        p.Routes |> List.exists ((=) d.Route)
+                                    )
+                        }
+                    )
+            }
+        )
+    | _ -> []
+
+
+let sortPat (d: Dose) =
+    let inline toInt x =
+        match x with
+        | Some x -> x |> int
+        | None -> 0
+
+    (d.MinAgeMo |> toInt) +
+//        (d.MaxAgeMo |> toInt) +
+    (d.MinWeightKg |> toInt) +
+//        (d.MaxWeightKg |> toInt) +
+    (d.MinGestAgeDays |> toInt) +
+//        (d.MaxGestAgeDays |> toInt) +
+    (d.MinPMAgeDays |> toInt) //+
+//        (d.MaxPMAgeDays |> toInt)
+
+
+let printDose (d : Dose) =
+    let printQ u = function
+    | Quantity q -> sprintf "%A %s" q u
+    | QuantityPerKg q -> sprintf "%A %s/kg" q u
+    | QuantityPerM2 q -> sprintf "%A %s/m2" q u
+
+    match d.NormDose with
+    | Some q -> q |> printQ d.Unit
+    | None -> ""
+    |> fun s ->
+        match d.MinDose, d.MaxDose with
+        | Some min, Some max ->
+            let min = min |> printQ d.Unit
+            let max = max |> printQ d.Unit
+            if s = "" then sprintf "van %s tot %s" min max
+            else sprintf "%s, van %s tot %s" s min max
+        | Some min, None ->
+            let min = min |> printQ d.Unit
+            if s = "" then sprintf "van %s" min
+            else sprintf "%s, van %s" s min
+        | None, Some max ->
+            let max = max |> printQ d.Unit
+            if s = "" then sprintf "tot %s" max
+            else sprintf "%s, tot %s" s max
+        | _ -> s
+        |> fun s ->
+            match d.AbsMaxDose with
+            | Some max ->
+                let max = max |> printQ d.Unit
+                let time =
+                    d.Freqs
+                    |> Seq.fold (fun acc f ->
+                        f.Time |> snd
+                    ) ""
+                if s = "" then sprintf "max %s per %s" max time
+                else sprintf "%s, max %s per %s" s max time
+            | None -> s
+            |> fun s ->
+                match d.MaxPerDose with
+                | Some max ->
+                    let max = max |> printQ d.Unit
+                    if s = "" then sprintf "max per keer %s" max
+                    else sprintf "%s, max per keer %s" s max
+                | None -> s
+
+
+let printFreq (f : Frequency) =
+    match (f.Time |> fst) with
+    | x when x = 1 -> sprintf "%A x / %s" f.Count (f.Time |> snd)
+    | _ -> sprintf "%A x / %A %s" f.Count (f.Time |> fst) (f.Time |> snd)
+
+
+let printPat p =
+    let printDays d =
+        (d / 7) |> sprintf "%A weken"
+
+    let printAge a =
+        match a with
+        | _ when a < 1. ->
+            (a * 30. / 7.)
+            |> int
+            |> fun i ->
+                if i = 1 then sprintf "%A week" i
+                else sprintf "%A weken" i
+        | _ when a < 12. ->
+            a
+            |> int
+            |> fun i ->
+                if i = 1 then sprintf "%A maand" i
+                else sprintf "%A maanden" i
+        | _ ->
+            (a / 12.)
+            |> int
+            |> fun i ->
+                if i = 1 then sprintf "%A jaar" i
+                else sprintf "%A jaar" i
+
+    match p.Gender with
+    | Male -> "man "
+    | Female -> "vrouw "
+    | Unknown _ -> ""
+    |> fun s ->
+        match p.MinAgeMo, p.MaxAgeMo with
+        | Some min, Some max ->
+            let min = min |> printAge
+            let max = max |> printAge
+            sprintf "%sleeftijd %s tot %s " s min max
+        | Some min, None ->
+            let min = min |> printAge
+            sprintf "%sleeftijd vanaf %s " s min
+        | None, Some max ->
+            let max = max |> printAge
+            sprintf "%sleeftijd tot %s " s max
+        | _ -> ""
+        |> fun s ->
+            match p.MinGestAgeDays, p.MaxGestAgeDays, p.MinPMAgeDays, p.MaxPMAgeDays with
+            | Some min, Some max, _, _ ->
+                let min = min |> printDays
+                let max = max |> printDays
+                sprintf "%sneonaten zwangerschapsduur %s tot %s" s min max
+            | Some min, None, _, _ ->
+                let min = min |> printDays
+                sprintf "%sneonaten zwangerschapsduur vanaf %s" s min
+            | None, Some max, _, _ ->
+                let max = max |> printDays
+                sprintf "%sneonaten zwangerschapsduur tot %s" s max
+            | _, _, Some min, Some max ->
+                let min = min |> printDays
+                let max = max |> printDays
+                sprintf "%sneonaten postconceptie leeftijd %s tot %s" s min max
+            | _, _, Some min, None ->
+                let min = min |> printDays
+                sprintf "%sneonaten postconceptie leeftijd vanaf %s" s min
+            | _, _, None, Some max ->
+                let max = max |> printDays
+                sprintf "%sneonaten postconceptie leeftijd tot %s" s max
+            | _ -> s
+            |> fun s ->
+                match p.MinWeightKg, p.MaxWeightKg with
+                | Some min, Some max -> sprintf "gewicht %A tot %A kg" min max
+                | Some min, None -> sprintf "gewicht van %A kg" min
+                | None, Some max -> sprintf "gewicht tot %A kg" max
+                | None, None -> ""
+                |> sprintf "%s %s" s
+                |> String.trim
+
+
+/// See for use of anonymous record in 
+/// fold: https://github.com/dotnet/fsharp/issues/6699
+let toMarkdown (ds : Types.Dose list) =
+    let generic_md = """
+# {generic}
+"""
+
+    let route_md = """
+### Route: {route}
+#### Producten
+{products}
+"""
+
+    let product_md =  """
+* {product}
+"""
+
+    let indication_md = """
+## Indicatie: {indication}
+"""
+
+    let dose_md = """
+#### Doseringen
+"""
+
+    let patient_md = """
+* Patient: **{patient}**<br>
+**{dose}**<br>
+in {freqs}
+"""
+    
+    ({| md = ""; doses = [] |}, ds
+    |> List.groupBy (fun d -> d.Generic))
+    ||> List.fold (fun acc (generic, ds) ->
+        {| acc with
+            md = generic_md |> String.replace "{generic}" generic
+            doses = ds
+        |}
+        |> fun r -> 
+            if r.doses = List.empty then r
+            else
+                (r, r.doses |> List.groupBy (fun d -> d.Indication))
+                ||> List.fold (fun acc (indication, ds) ->
+                    {| acc with
+                        md = acc.md + (indication_md |> String.replace "{indication}" indication)
+                        doses = ds
+                    |}
+                    |> fun r -> 
+                        if r.doses = List.empty then r
+                        else
+                            (r, r.doses |> List.groupBy (fun r -> r.Route))
+                            ||> List.fold (fun acc (route, ds) ->
+
+                                let s = 
+                                    ds
+                                    |> List.collect (fun d -> d.Products)
+                                    |> List.sortBy (fun p -> p.Concentration)
+                                    |> List.map (fun p -> product_md |> String.replace "{product}" p.ProductLabel)
+                                    |> List.distinct
+                                    |> String.concat "\n"
+                                {| acc with
+                                    md = acc.md + (route_md 
+                                                   |> String.replace "{route}" route
+                                                   |> String.replace "{products}" s)
+                                                + dose_md
+                                    doses = ds
+                                |}
+                                |> fun r ->
+                                    if r.doses = List.empty then r
+                                    else
+                                        (r, r.doses 
+                                            |> List.sortBy (fun d -> d |> sortPat)
+                                            |> List.groupBy (fun d -> d |> printPat))
+                                        ||> List.fold (fun acc (pat, ds) ->
+
+                                            let dose =
+                                                ds
+                                                |> List.map printDose
+                                                |> List.distinct
+                                                |> function
+                                                | [d] -> d
+                                                | _ -> ""
+
+
+                                            let freqs =
+                                                if dose = "" then ""
+                                                else
+                                                    ds 
+                                                    |> List.tryHead
+                                                    |> function
+                                                    | Some h -> 
+                                                        h.Freqs 
+                                                        |> List.map printFreq
+                                                        |> String.concat ", "
+                                                    | None -> ""
+
+                                            {| acc with
+                                                md = 
+                                                    if dose = "" then acc.md
+                                                    else
+                                                        acc.md + (patient_md 
+                                                                  |> String.replace "{patient}" pat
+                                                                  |> String.replace "{dose}" dose
+                                                                  |> String.replace "{freqs}" freqs)
+                                            |}
+                                        )
+                            )
+                )
+    ) 
+    |> fun r -> r.md

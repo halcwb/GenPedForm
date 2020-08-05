@@ -3,11 +3,20 @@
     <PropertyGroup>
         <OutputType>Exe</OutputType>
         <TargetFramework>netcoreapp3.1</TargetFramework>
+        <AspNetCoreHostingModel>OutOfProcess</AspNetCoreHostingModel>
+        <AspNetCoreModuleName>AspNetCoreModule</AspNetCoreModuleName>
     </PropertyGroup>
     <ItemGroup>
         <None Include="paket.references" />
-        <Compile Include="..\Shared\Shared.fs" />
+        <None Include="Scripts\Database.fsx" />
+        <None Include="Scripts/Data.fsx" />
+        <Compile Include="Env.fs" />
+        <Compile Include="../Shared/Shared.fs" />
         <Compile Include="Server.fs" />
+        <Compile Include="Program.fs" />
+    </ItemGroup>
+    <ItemGroup>
+      <ProjectReference Include="..\Lib\Lib.fsproj" />
     </ItemGroup>
     <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

@@ -17,6 +17,7 @@
 # Add fsx files
 !*.fsx
 
+
 # Add package.json and webpackconfig
 !package.json
 !webpack.config.js
@@ -79,6 +80,8 @@ publishnuget.cmd
 !/src/Client/public/*.*
 !/src/Client/index.html
 !/src/Client/style.scss
+!/src/Lib/
+!/src/Lib/Scripts/
 
 # Add test files
 

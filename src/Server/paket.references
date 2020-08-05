@@ -1,5 +1,9 @@
 group Server
-FSharp.Core
-Saturn
-Thoth.Json.Giraffe
-FSharp.Data
+    FSharp.Core
+    Saturn
+    Thoth.Json.Giraffe
+    FSharp.Data
+    DustyTables
+    Fable.Remoting.Giraffe
+    Serilog.AspNetCore
+	Serilog.Sinks.Console

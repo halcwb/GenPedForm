@@ -16,22 +16,17 @@ let defaultTheme = Styles.createMuiTheme()
 
 type Model =
     { Generics: string list
-      Products: Products
-      Details: Deferred<string>
-    }
+      SelectedGeneric: string option
+      Indications : Deferred<string list>
+      Details: Deferred<string> }
 
 
 type Msg =
-    | LoadProducts of AsyncOperationStatus<Result<Products, string>>
     | LoadGenerics of AsyncOperationStatus<Result<Generics, string>>
+    | LoadIndications of AsyncOperationStatus<Result<string list, string>>
     | LoadMarkdown of AsyncOperationStatus<Result<string, string>>
-    | Selected of string
-
-
-let loadProducts =
-    async {
-        let! products = Server.api.GetProducts()
-        return LoadProducts(Finished products) }
+    | SelectGeneric of string
+    | SelectIndication of string
 
 
 let loadGenerics =
@@ -39,16 +34,20 @@ let loadGenerics =
         let! generics = Server.api.GetGenerics()
         return LoadGenerics(Finished generics) }
 
+let loadIndications generic =
+    async {
+        let! indications = Server.api.GetIndications generic
+        return LoadIndications(Finished indications) }
+
 let init(): Model * Cmd<Msg> =
     let initialModel =
-        { Products = []
-          Generics = []
-          Details  = HasNotStartedYet
-        }
+        { Generics = []
+          SelectedGeneric = None
+          Indications = HasNotStartedYet
+          Details = HasNotStartedYet }
 
     let loadCmd =
-        [ Cmd.fromAsync loadProducts
-          Cmd.fromAsync loadGenerics ]
+        [ Cmd.fromAsync loadGenerics ]
         |> Cmd.batch
 
     initialModel, loadCmd
@@ -56,25 +55,48 @@ let init(): Model * Cmd<Msg> =
 
 let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     match msg with
-    | LoadProducts(Finished(Ok products)) -> { model with Products = products }, Cmd.none
     | LoadGenerics(Finished(Ok generics)) -> { model with Generics = generics }, Cmd.none
-    | Selected s ->
+    | SelectGeneric s ->
         if s <> "" then
-            let load = 
+            let loadMarkdown =
                 async {
-                    let! details = Server.api.GetMarkdown s
-                    return LoadMarkdown(Finished details)
-                }
-            { model with
-                Details = InProgress }, Cmd.fromAsync load
-        else 
-            {
-                model with 
-                    Details = HasNotStartedYet
-            }, Cmd.none
-    | LoadMarkdown(Finished(Ok s)) ->
-        { model with
-            Details = Resolved s }, Cmd.none
+                    let! details = Server.api.GetMarkdown (s, None)
+                    return LoadMarkdown(Finished details) }
+
+            let loadIndications =
+                async {
+                    let! indications = Server.api.GetIndications s
+                    return LoadIndications(Finished indications) }
+
+            let cmds =
+                [ Cmd.fromAsync loadMarkdown
+                  Cmd.fromAsync loadIndications ]
+                |> Cmd.batch
+            { model with 
+                SelectedGeneric = Some s
+                Details = InProgress }, cmds
+
+        else
+            { model with 
+                Details = HasNotStartedYet
+                Indications = HasNotStartedYet }, Cmd.none
+
+    | SelectIndication s ->
+        if s <> "" && model.SelectedGeneric |> Option.isSome then
+
+            let loadMarkdown =
+                async {
+                    let! details = Server.api.GetMarkdown (model.SelectedGeneric |> Option.get, Some s)
+                    return LoadMarkdown(Finished details) }
+            
+            { model with Details = InProgress}, Cmd.fromAsync loadMarkdown
+        else model, Cmd.none
+
+    | LoadMarkdown(Finished(Ok s)) -> { model with Details = Resolved s }, Cmd.none
+
+    | LoadIndications(Finished(Ok indications)) ->
+        { model with Indications = Resolved indications }, Cmd.none
+
     | _ -> model, Cmd.none
 
 
@@ -85,28 +107,43 @@ let showProducts (products: Products) =
 
 
 let render (model: Model) (dispatch: Msg -> unit) =
-    let autocomplete =
-        { Autocomplete.props with
-              Dispatch = (Selected >> dispatch)
-              Options = model.Generics |> List.sort
-              Label = "Zoek een generiek"
-              Filter = Filter.StartsWith }
-        |> Autocomplete.render
+    let filter =
+        [
+            { Autocomplete.props with
+                  Dispatch = (SelectGeneric >> dispatch)
+                  Options = model.Generics |> List.sort
+                  Label = "Zoek een generiek"
+                  Filter = Filter.StartsWith }
+            |> Autocomplete.render
 
-    let details = 
+            match model.Indications with
+            | Resolved indications ->
+                Html.div [
+                    prop.style [ style.marginTop 20 ]
+                    prop.children [
+                        { Autocomplete.props with 
+                            Dispatch = SelectIndication >> dispatch
+                            Options = indications |> List.sort
+                            Label = "Kies een indicatie"
+                            Filter = Filter.ContainsCaseSensitive
+                        }
+                        |> Autocomplete.render
+                    ]
+                ]
+                
+            | _ -> ()
+        ]
+
+
+    let details =
         match model.Details with
-        | HasNotStartedYet ->
-            "## Geen generiek gekozen"
-        | InProgress ->
-            "## Doseringen worden opgehaald ..."
+        | HasNotStartedYet -> "## Geen generiek gekozen"
+        | InProgress -> "## Doseringen worden opgehaald ..."
         | Resolved s ->
-            printfn "%s" s
             s
         |> markdown.source
         |> List.singleton
-        |> List.append [
-            markdown.escapeHtml false
-        ]
+        |> List.append [ markdown.escapeHtml false ]
         |> Markdown.markdown
         |> Html.div
 
@@ -134,9 +171,9 @@ let render (model: Model) (dispatch: Msg -> unit) =
                       [ prop.style [ style.marginTop 80 ]
                         prop.children
                             [ // search
-                              Mui.paper
+                              Html.div
                                   [ prop.style [ style.padding 10 ]
-                                    paper.children [ autocomplete ] ]
+                                    paper.children filter ]
                               // details
                               Mui.paper
                                   [ prop.style

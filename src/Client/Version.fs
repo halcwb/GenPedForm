@@ -1,4 +1,4 @@
-module Version
+﻿module Version
 
 let template = "1.20.0"
 

@@ -10,7 +10,7 @@ module Queries =
 open Types
 open Lib
 open Utils
-
+open Informedica.GenUtils.Lib.BCL
 
 let (|Regex|_|) pattern input =
     let m = (String.regex pattern).Match(input) // Regex.Match(input, pattern)
@@ -183,66 +183,128 @@ let sortPat (d: Dose) =
         | Some x -> x |> int
         | None -> 0
 
-    (d.MinAgeMo |> toInt) +
-//        (d.MaxAgeMo |> toInt) +
+    (d.MinAgeMo 
+     |> Option.bind (fun x -> x * 30. |> Some)
+     |> toInt |> fun s -> if s > 0 then s + 300 else s) +
     (d.MinWeightKg |> toInt) +
-//        (d.MaxWeightKg |> toInt) +
     (d.MinGestAgeDays |> toInt) +
-//        (d.MaxGestAgeDays |> toInt) +
-    (d.MinPMAgeDays |> toInt) //+
-//        (d.MaxPMAgeDays |> toInt)
+    (d.MinPMAgeDays |> toInt) 
 
 
 let printDose (d : Dose) =
+    let format d =
+        d 
+        |> Double.fixPrecision 3
+        |> fun d ->
+            if (d |> int |> float) = d then sprintf "%A" (d |> int) 
+            else d |> sprintf "%A"
+
     let printQ u = function
-    | Quantity q -> sprintf "%A %s" q u
-    | QuantityPerKg q -> sprintf "%A %s/kg" q u
-    | QuantityPerM2 q -> sprintf "%A %s/m2" q u
+    | Quantity q -> 
+        if u = "" then sprintf "%s" (q |> format)
+        else 
+            sprintf "%s %s" (q |> format) u
+    | QuantityPerKg q -> 
+        if u = "" then sprintf "%s" (q |> format)
+        else 
+            sprintf "%s %s/kg" (q |> format) u
+    | QuantityPerM2 q -> 
+        if u = "" then sprintf "%s" (q |> format)
+        else 
+            sprintf "%s %s/m2" (q |> format) u
 
-    match d.NormDose with
-    | Some q -> q |> printQ d.Unit
-    | None -> ""
+    match d.NormDose, d.MinDose, d.MaxDose with
+    | None, None, None -> ""
+    | Some norm, Some min, Some max when norm = min ->
+        let min = min |> printQ ""
+        let max = max |> printQ d.Unit
+        sprintf "%s - %s" min max
+    | Some norm, Some min, Some max ->
+        let norm = norm |> printQ ""
+        let min = min |> printQ ""
+        let max = max |> printQ d.Unit
+        sprintf "%s, %s - %s" norm min max
+    | Some norm, Some min, None when norm = min ->
+        let min = min |> printQ d.Unit
+        sprintf "tot %s" min
+    | Some norm, Some min, None ->
+        let norm = norm |> printQ ""
+        let min = min |> printQ d.Unit
+        sprintf "%s, vanaf %s" norm min
+    | Some norm, None, Some max when norm = max ->
+        let max = max |> printQ d.Unit
+        sprintf "tot %s" max
+    | Some norm, None, None ->
+        let norm = norm |> printQ d.Unit
+        sprintf "%s" norm
+    | Some norm, None, Some max ->
+        let norm = norm |> printQ  ""
+        let max = max |> printQ d.Unit
+        sprintf "%s - %s" norm max
+    | None, Some min, Some max ->
+        let min = min |> printQ ""
+        let max = max |> printQ d.Unit
+        sprintf "%s - %s" min max
+    | None, Some min, None ->
+        let min = min |> printQ d.Unit
+        sprintf "vanaf %s" min
+    | None, None, Some max ->
+        let max = max |> printQ d.Unit
+        sprintf "tot %s" max
     |> fun s ->
-        match d.MinDose, d.MaxDose with
-        | Some min, Some max ->
-            let min = min |> printQ d.Unit
+        let s = 
+            if s = "" then s 
+            else
+                sprintf "**%s**" s
+
+        match d.AbsMaxDose, d.MaxPerDose with
+        | None, None -> s
+        | Some max, None ->
             let max = max |> printQ d.Unit
-            if s = "" then sprintf "van %s tot %s" min max
-            else sprintf "%s, van %s tot %s" s min max
-        | Some min, None ->
-            let min = min |> printQ d.Unit
-            if s = "" then sprintf "van %s" min
-            else sprintf "%s, van %s" s min
-        | None, Some max ->
+            let time =
+                d.Freqs
+                |> Seq.fold (fun _ f ->
+                    f.Time |> snd
+                ) ""
+            if s = "" then sprintf "**max %s per %s**" max time
+            else sprintf "%s (*max %s per %s*)" s max time
+        | None, Some keer ->
+            let keer = keer |> printQ d.Unit
+            if s = "" then sprintf "**max %s per keer**" keer
+            else sprintf "%s (max %s per keer)" s keer
+        | Some max, Some keer ->
+            let keer = keer |> printQ d.Unit
             let max = max |> printQ d.Unit
-            if s = "" then sprintf "tot %s" max
-            else sprintf "%s, tot %s" s max
-        | _ -> s
-        |> fun s ->
-            match d.AbsMaxDose with
-            | Some max ->
-                let max = max |> printQ d.Unit
-                let time =
-                    d.Freqs
-                    |> Seq.fold (fun acc f ->
-                        f.Time |> snd
-                    ) ""
-                if s = "" then sprintf "max %s per %s" max time
-                else sprintf "%s, max %s per %s" s max time
-            | None -> s
-            |> fun s ->
-                match d.MaxPerDose with
-                | Some max ->
-                    let max = max |> printQ d.Unit
-                    if s = "" then sprintf "max per keer %s" max
-                    else sprintf "%s, max per keer %s" s max
-                | None -> s
+            let time =
+                d.Freqs
+                |> Seq.fold (fun _ f ->
+                    f.Time |> snd
+                ) ""
+            if s = "" then 
+                sprintf "**max %s per %s en max %s per keer**" max time keer
+            else sprintf "%s (max %s per %s en max %s per keer)" s max time keer
 
 
-let printFreq (f : Frequency) =
-    match (f.Time |> fst) with
-    | x when x = 1 -> sprintf "%A x / %s" f.Count (f.Time |> snd)
-    | _ -> sprintf "%A x / %A %s" f.Count (f.Time |> fst) (f.Time |> snd)
+
+let printFreqs (fs : Frequency list) =
+    fs
+    |> List.distinct
+    |> List.groupBy (fun f -> f.Time)
+    |> List.map (fun (t, fs) ->
+        let c =
+            fs
+            |> List.sortBy (fun f -> f.Count)
+            |> List.map (fun f -> f.Count |> sprintf "%A")
+            |> String.concat ", "
+
+        match (t |> fst) with
+        | x when x = 1 -> 
+            sprintf "%s x / %s" c (t |> snd)
+        | _ -> 
+            sprintf "%s x / %i %s" c (t |> fst) (t |> snd)
+    )
+    |> String.concat ", "
+
 
 
 let printPat p =
@@ -251,8 +313,14 @@ let printPat p =
 
     let printAge a =
         match a with
+        | _ when ((a * 31.) / 7.) < 1. ->
+            (a * 31.)
+            |> int
+            |> fun i ->
+                if i = 1 then sprintf "%A dag" i
+                else sprintf "%A dagen" i
         | _ when a < 1. ->
-            (a * 30. / 7.)
+            ((a * 31.) / 7.)
             |> int
             |> fun i ->
                 if i = 1 then sprintf "%A week" i
@@ -347,8 +415,8 @@ let toMarkdown (ds : Types.Dose list) =
 
     let patient_md = """
 * Patient: **{patient}**<br>
-**{dose}**<br>
-in {freqs}
+{dose}<br>
+in **{freqs}**
 """
     
     ({| md = ""; doses = [] |}, ds
@@ -408,13 +476,8 @@ in {freqs}
                                                 if dose = "" then ""
                                                 else
                                                     ds 
-                                                    |> List.tryHead
-                                                    |> function
-                                                    | Some h -> 
-                                                        h.Freqs 
-                                                        |> List.map printFreq
-                                                        |> String.concat ", "
-                                                    | None -> ""
+                                                    |> List.collect (fun d -> d.Freqs)
+                                                    |> printFreqs
 
                                             {| acc with
                                                 md = 

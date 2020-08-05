@@ -1,9 +1,9 @@
+Informedica.GenUtils.Lib
+FSharp.Core
+
 group Server
-    FSharp.Core
     Saturn
     Thoth.Json.Giraffe
-    FSharp.Data
-    DustyTables
     Fable.Remoting.Giraffe
     Serilog.AspNetCore
 	Serilog.Sinks.Console

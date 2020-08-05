@@ -1,26 +1,28 @@
+source https://api.nuget.org/v3/index.json
+framework: auto-detect
+storage: none
+
+nuget Informedica.GenUtils.Lib prerelease
+nuget FSharp.Core
+
 group Library
     source https://api.nuget.org/v3/index.json
     framework: net46,net472,netstandard2.0,netstandard2.1
     storage: none
 
-    nuget FSharp.Core
     nuget FSharp.Data
     nuget Microsoft.Data.SqlClient 
-    nuget Informedica.GenUtils.Lib prerelease
-
 
 group Server
     source https://api.nuget.org/v3/index.json
     framework: netcoreapp3.1
     storage: none
 
-    nuget FSharp.Core
     nuget FSharp.Data
     nuget Saturn
     nuget Fable.Remoting.Giraffe
     nuget Microsoft.AspNetCore.Authentication.JwtBearer 3.0.2 // pin for netcoreapp30
     nuget Thoth.Json.Giraffe
-    nuget DustyTables
     nuget Serilog.AspNetCore
 	nuget Serilog.Sinks.Console
 

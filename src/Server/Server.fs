@@ -6,6 +6,7 @@ open Microsoft.Extensions.Configuration
 open Shared
 open Shared.Api
 
+open Informedica.GenUtils.Lib.BCL
 
 let getProducts connString =
     Doses.getProducts connString
@@ -22,13 +23,29 @@ let getGenerics connString =
     )
     |> List.distinct
 
-
-let getMarkdown connString generic =
+let getIndications connString generic =
     Doses.getDoses connString
-    |> List.filter (fun d ->
-        d.Generic =generic
+    |> List.filter (fun d -> d.Generic = generic)
+    |> List.map (fun d ->
+        d.Indication
     )
-    |> Doses.toMarkdown
+    |> List.distinct
+
+let getMarkdown connString generic indication =
+    match indication with
+    | Some i ->
+        Doses.getDoses connString
+        |> List.filter (fun d ->
+            d.Generic = generic && 
+            d.Indication |> String.equalsCapInsens i
+        )
+        |> Doses.toMarkdown
+    | None ->
+        Doses.getDoses connString
+        |> List.filter (fun d ->
+            d.Generic = generic
+        )
+        |> Doses.toMarkdown
 
 
 /// An implementation of the Shared IServerApi protocol.
@@ -39,8 +56,7 @@ type ServerApi(logger: ILogger<ServerApi>, config: IConfiguration) =
         match (Env.environmentVars ()).TryGetValue "CONN_STR_AP" with
         | true, s -> s
         | _ -> 
-            printfn "cannot find the connections string"
-            ""
+            config.GetValue("DATABASE_CONNECTIONSTRING_AP")
         
     member this.GetProducts () = 
         async {
@@ -63,10 +79,22 @@ type ServerApi(logger: ILogger<ServerApi>, config: IConfiguration) =
                     return Error error.Message
         }        
 
-    member this.GetMarkdown generic =
+    member this.GetIndications generic =
         async {
             try
-                let markdown = generic |> getMarkdown connString
+                let indications = getIndications connString generic
+                return Ok indications
+            with
+                | error -> 
+                    logger.LogError(error, "Error while retrieving indications from database")
+                    return Error error.Message
+        }
+
+
+    member this.GetMarkdown (generic, indication) =
+        async {
+            try
+                let markdown = getMarkdown connString generic indication
                 return Ok markdown
             with
                 | error -> 
@@ -78,6 +106,7 @@ type ServerApi(logger: ILogger<ServerApi>, config: IConfiguration) =
         {
             GetProducts = this.GetProducts
             GetGenerics = this.GetGenerics
+            GetIndications = this.GetIndications
             GetMarkdown = this.GetMarkdown
         }
 

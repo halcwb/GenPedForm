@@ -29,5 +29,6 @@ module Api =
     type IServerApi = {
         GetGenerics : unit -> Async<Result<Generics, string>>
         GetProducts : unit -> Async<Result<Products, string>>
-        GetMarkdown : string -> Async<Result<string, string>>
+        GetIndications : string -> Async<Result<string list, string>>
+        GetMarkdown : (string * string option) -> Async<Result<string, string>>
     }

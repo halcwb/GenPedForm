@@ -1,4 +1,6 @@
+Informedica.GenUtils.Lib
+FSharp.Core
+
 group Library
-    FSharp.Core
     FSharp.Data
     Microsoft.Data.SqlClient

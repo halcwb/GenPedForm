@@ -13,11 +13,12 @@ module Filter = Autocomplete.Filter
 
 let defaultTheme = Styles.createMuiTheme()
 
-
 type Model =
-    { Generics: string list
-      SelectedGeneric: string option
-      Indications : Deferred<string list>
+    { SelectedGeneric: string option
+      SelectedIndication: string option
+      SelectedRoute: string option
+      Generics: Deferred<string list>
+      Indications: Deferred<string list>
       Details: Deferred<string> }
 
 
@@ -41,26 +42,26 @@ let loadIndications generic =
 
 let init(): Model * Cmd<Msg> =
     let initialModel =
-        { Generics = []
-          SelectedGeneric = None
+        { SelectedGeneric = None
+          SelectedIndication = None
+          SelectedRoute = None
+          Generics = InProgress
           Indications = HasNotStartedYet
           Details = HasNotStartedYet }
 
-    let loadCmd =
-        [ Cmd.fromAsync loadGenerics ]
-        |> Cmd.batch
+    let loadCmd = [ Cmd.fromAsync loadGenerics ] |> Cmd.batch
 
     initialModel, loadCmd
 
 
 let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     match msg with
-    | LoadGenerics(Finished(Ok generics)) -> { model with Generics = generics }, Cmd.none
+    | LoadGenerics(Finished(Ok generics)) -> { model with Generics = Resolved generics }, Cmd.none
     | SelectGeneric s ->
         if s <> "" then
             let loadMarkdown =
                 async {
-                    let! details = Server.api.GetMarkdown (s, None)
+                    let! details = Server.api.GetMarkdown(s, None)
                     return LoadMarkdown(Finished details) }
 
             let loadIndications =
@@ -72,30 +73,34 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
                 [ Cmd.fromAsync loadMarkdown
                   Cmd.fromAsync loadIndications ]
                 |> Cmd.batch
-            { model with 
-                SelectedGeneric = Some s
-                Details = InProgress }, cmds
+            { model with
+                  SelectedGeneric = Some s
+                  SelectedIndication = None
+                  Indications = InProgress
+                  Details = InProgress }, cmds
 
         else
-            { model with 
-                Details = HasNotStartedYet
-                Indications = HasNotStartedYet }, Cmd.none
+            { model with
+                  SelectedGeneric = None
+                  SelectedIndication = None
+                  Details = HasNotStartedYet
+                  Indications = HasNotStartedYet }, Cmd.none
 
     | SelectIndication s ->
         if s <> "" && model.SelectedGeneric |> Option.isSome then
 
             let loadMarkdown =
                 async {
-                    let! details = Server.api.GetMarkdown (model.SelectedGeneric |> Option.get, Some s)
+                    let! details = Server.api.GetMarkdown(model.SelectedGeneric |> Option.get, Some s)
                     return LoadMarkdown(Finished details) }
-            
-            { model with Details = InProgress}, Cmd.fromAsync loadMarkdown
-        else model, Cmd.none
+
+            { model with Details = InProgress }, Cmd.fromAsync loadMarkdown
+        else
+            model, Cmd.none
 
     | LoadMarkdown(Finished(Ok s)) -> { model with Details = Resolved s }, Cmd.none
 
-    | LoadIndications(Finished(Ok indications)) ->
-        { model with Indications = Resolved indications }, Cmd.none
+    | LoadIndications(Finished(Ok indications)) -> { model with Indications = Resolved indications }, Cmd.none
 
     | _ -> model, Cmd.none
 
@@ -108,39 +113,36 @@ let showProducts (products: Products) =
 
 let render (model: Model) (dispatch: Msg -> unit) =
     let filter =
-        [
-            { Autocomplete.props with
-                  Dispatch = (SelectGeneric >> dispatch)
-                  Options = model.Generics |> List.sort
-                  Label = "Zoek een generiek"
-                  Filter = Filter.StartsWith }
-            |> Autocomplete.render
+        [ match model.Generics with
+          | Resolved generics ->
+              { Autocomplete.props with
+                    Dispatch = (SelectGeneric >> dispatch)
+                    Options = generics |> List.sort
+                    Label = sprintf "Zoek een generiek (van %i totaal)" (generics |> List.length)
+                    Filter = Filter.StartsWith }
+              |> Autocomplete.render "generics"
+          | _ -> ()
 
-            match model.Indications with
-            | Resolved indications ->
-                Html.div [
-                    prop.style [ style.marginTop 20 ]
-                    prop.children [
-                        { Autocomplete.props with 
-                            Dispatch = SelectIndication >> dispatch
-                            Options = indications |> List.sort
-                            Label = "Kies een indicatie"
-                            Filter = Filter.ContainsCaseSensitive
-                        }
-                        |> Autocomplete.render
-                    ]
-                ]
-                
-            | _ -> ()
-        ]
+          match model.Indications with
+          | Resolved indications when indications |> List.length > 1 ->
+              Html.div
+                  [ prop.style [ style.marginTop 20 ]
+                    prop.children
+                        [ { Autocomplete.props with
+                                Dispatch = SelectIndication >> dispatch
+                                Options = indications |> List.sort
+                                Label = sprintf "Kies een indicatie (van %i totaal)" (indications |> List.length)
+                                Filter = Filter.ContainsCaseSensitive }
+                          |> Autocomplete.render "indications" ] ]
+
+          | _ -> () ]
 
 
     let details =
         match model.Details with
         | HasNotStartedYet -> "## Geen generiek gekozen"
         | InProgress -> "## Doseringen worden opgehaald ..."
-        | Resolved s ->
-            s
+        | Resolved s -> s
         |> markdown.source
         |> List.singleton
         |> List.append [ markdown.escapeHtml false ]
@@ -149,7 +151,8 @@ let render (model: Model) (dispatch: Msg -> unit) =
 
 
     Mui.themeProvider
-        [ themeProvider.children
+        [ themeProvider.theme defaultTheme
+          themeProvider.children
             [ Html.div
                 [ Mui.appBar
                     [ prop.style

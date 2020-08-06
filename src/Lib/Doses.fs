@@ -111,7 +111,7 @@ let getDoses connString : Dose list =
             Generic = optStr "Generic"
             Shape = optStr "Shape"
             Route = optStr "Route"
-            Indication = optStr "Indication"
+            Indication = optStr "Indication" |> String.toLower
             Specialty = ""
             Gender = Unknown (optStr "Gender")
             MinAgeMo = doubleOrNone "MinAge"
@@ -220,10 +220,10 @@ let printDose (d : Dose) =
         let max = max |> printQ d.Unit
         sprintf "%s - %s" min max
     | Some norm, Some min, Some max ->
-        let norm = norm |> printQ ""
+        let norm = norm |> printQ d.Unit
         let min = min |> printQ ""
         let max = max |> printQ d.Unit
-        sprintf "%s, %s - %s" norm min max
+        sprintf "%s (%s - %s)" norm min max
     | Some norm, Some min, None when norm = min ->
         let min = min |> printQ d.Unit
         sprintf "tot %s" min
@@ -379,11 +379,15 @@ let printPat p =
                 sprintf "%sneonaten postconceptie leeftijd tot %s" s max
             | _ -> s
             |> fun s ->
+                let toStr v =
+                    if (v |> int |> float) = v then v |> int |> sprintf "%i"
+                    else v |> sprintf "%A"
+
                 match p.MinWeightKg, p.MaxWeightKg with
-                | Some min, Some max -> sprintf "gewicht %A tot %A kg" min max
-                | Some min, None -> sprintf "gewicht van %A kg" min
-                | None, Some max -> sprintf "gewicht tot %A kg" max
-                | None, None -> ""
+                | Some min, Some max -> sprintf "gewicht %s tot %s kg" (min |> toStr) (max |> toStr)
+                | Some min, None     -> sprintf "gewicht vanaf %s kg" (min |> toStr)
+                | None,     Some max -> sprintf "gewicht tot %s kg" (max |> toStr)
+                | None,     None     -> ""
                 |> sprintf "%s %s" s
                 |> String.trim
 

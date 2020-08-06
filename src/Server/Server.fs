@@ -6,25 +6,31 @@ open Microsoft.Extensions.Configuration
 open Shared
 open Shared.Api
 
+open Informedica.GenUtils.Lib
 open Informedica.GenUtils.Lib.BCL
 
-let getProducts connString =
-    Doses.getProducts connString
+let getDoses =
+    Memoization.memoize Doses.getDoses
+
+let getProducts =
+    Memoization.memoize Doses.getProducts
+
+let getGenericLabels connString =
+    getProducts connString
     |> List.map (fun p ->
         p.GenericLabel
     )
     |> List.distinct
 
-
 let getGenerics connString =
-    Doses.getDoses connString
+    getDoses connString
     |> List.map (fun d ->
         d.Generic
     )
     |> List.distinct
 
 let getIndications connString generic =
-    Doses.getDoses connString
+    getDoses connString
     |> List.filter (fun d -> d.Generic = generic)
     |> List.map (fun d ->
         d.Indication
@@ -32,20 +38,20 @@ let getIndications connString generic =
     |> List.distinct
 
 let getMarkdown connString generic indication =
+    let doses = getDoses connString
     match indication with
     | Some i ->
-        Doses.getDoses connString
+        doses
         |> List.filter (fun d ->
             d.Generic = generic && 
             d.Indication |> String.equalsCapInsens i
         )
-        |> Doses.toMarkdown
     | None ->
-        Doses.getDoses connString
+        doses
         |> List.filter (fun d ->
             d.Generic = generic
         )
-        |> Doses.toMarkdown
+    |> Doses.toMarkdown
 
 
 /// An implementation of the Shared IServerApi protocol.
@@ -61,7 +67,7 @@ type ServerApi(logger: ILogger<ServerApi>, config: IConfiguration) =
     member this.GetProducts () = 
         async {
             try 
-                let products = getProducts connString
+                let products = getGenericLabels connString
                 return Ok products
             with 
                 | error -> 

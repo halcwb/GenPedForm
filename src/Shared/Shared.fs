@@ -19,6 +19,11 @@ type Products = string list
 
 type Generics = string list
 
+type Query =
+    { Generic : string
+      Indication : string option
+      Route : string option
+      Patient : string option }
 
 module Api =
 
@@ -30,5 +35,6 @@ module Api =
         GetGenerics : unit -> Async<Result<Generics, string>>
         GetProducts : unit -> Async<Result<Products, string>>
         GetIndications : string -> Async<Result<string list, string>>
-        GetMarkdown : (string * string option) -> Async<Result<string, string>>
+        GetRoutes : string -> string -> Async<Result<string list, string>>
+        GetMarkdown : Query -> Async<Result<string, string>>
     }

@@ -54,8 +54,7 @@ module Autocomplete =
           Label = ""
           Filter = Filter.Contains }
 
-    let private useStyles =
-        Styles.makeStyles (fun theme styles -> {|  |})
+    let private useStyles = Styles.makeStyles (fun theme styles -> {|  |})
 
     // It seems that options need to be an array of objects.
     // Make the objects optional to allow for the case of no
@@ -68,11 +67,11 @@ module Autocomplete =
     let applyToOption def f (o: {| label: string |} option) =
         match o with
         | Some o -> o.label |> f
-        | None   -> def()
+        | None -> def()
 
-    let private comp n =
+    let private comp =
         React.functionComponent
-            ("autocomplete-" + n ,
+            ("autocomplete",
              (fun (props: Props) ->
                  let _, dispatch = React.useElmish (init, update props.Dispatch, [||])
                  let classes = useStyles()
@@ -107,4 +106,4 @@ module Autocomplete =
                                    | Filter.Exact -> label = state
                                | None -> false)) ]))
 
-    let render n props = comp n (props)
+    let render props = comp (props)

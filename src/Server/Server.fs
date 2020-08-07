@@ -37,16 +37,32 @@ let getIndications connString generic =
     )
     |> List.distinct
 
-let getMarkdown connString generic indication =
+let getRoutes connString generic indication =
+    getDoses connString
+    |> List.filter (fun d -> d.Generic = generic && d.Indication = indication)
+    |> List.map (fun d ->
+        d.Route
+    )
+    |> List.distinct
+
+
+let getMarkdown connString generic indication route =
     let doses = getDoses connString
-    match indication with
-    | Some i ->
+    match indication, route with
+    | Some i, Some r ->
+        doses
+        |> List.filter (fun d ->
+            d.Generic = generic && 
+            d.Indication |> String.equalsCapInsens i &&
+            d.Route |> String.equalsCapInsens r
+        )
+    | Some i, None ->
         doses
         |> List.filter (fun d ->
             d.Generic = generic && 
             d.Indication |> String.equalsCapInsens i
         )
-    | None ->
+    | None, _ ->
         doses
         |> List.filter (fun d ->
             d.Generic = generic
@@ -96,11 +112,22 @@ type ServerApi(logger: ILogger<ServerApi>, config: IConfiguration) =
                     return Error error.Message
         }
 
-
-    member this.GetMarkdown (generic, indication) =
+    member this.GetRoutes generic indication =
         async {
             try
-                let markdown = getMarkdown connString generic indication
+                let routes = getRoutes connString generic indication
+                return Ok routes
+            with
+                | error -> 
+                    logger.LogError(error, "Error while retrieving routes from database")
+                    return Error error.Message
+        }
+
+
+    member this.GetMarkdown (qry : Query) =
+        async {
+            try
+                let markdown = getMarkdown connString qry.Generic qry.Indication qry.Route
                 return Ok markdown
             with
                 | error -> 
@@ -113,6 +140,7 @@ type ServerApi(logger: ILogger<ServerApi>, config: IConfiguration) =
             GetProducts = this.GetProducts
             GetGenerics = this.GetGenerics
             GetIndications = this.GetIndications
+            GetRoutes = this.GetRoutes
             GetMarkdown = this.GetMarkdown
         }
 

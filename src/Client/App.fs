@@ -19,11 +19,11 @@ type State =
       SelectedIndication: string option
       SelectedRoute: string option
       SelectedPatient: string option
-      Versions : Deferred<(int * DateTime) list>
+      Versions: Deferred<(int * DateTime) list>
       Generics: Deferred<string list>
       Indications: Deferred<string list>
       Routes: Deferred<string list>
-      Patients : Deferred<string list>
+      Patients: Deferred<string list>
       Details: Deferred<string> }
 
 
@@ -47,13 +47,12 @@ let qry: Query =
 
 let loadVersions =
     async {
-        let! versions = Server.api.GetVersions ()
-        return LoadVersions(Finished versions)
-    }
+        let! versions = Server.api.GetVersions()
+        return LoadVersions(Finished versions) }
 
 let loadGenerics =
     async {
-        let! generics = Server.api.GetGenerics ()
+        let! generics = Server.api.GetGenerics()
         return LoadGenerics(Finished generics) }
 
 let loadIndications generic =
@@ -69,8 +68,7 @@ let loadRoutes generic indication =
 let loadPatients generic indication route =
     async {
         let! pats = Server.api.GetPatients generic indication route
-        return LoadPatients(Finished pats)
-    }
+        return LoadPatients(Finished pats) }
 
 let loadMarkdown qry =
     async {
@@ -92,19 +90,17 @@ let initialState =
 
 let init(): State * Cmd<Msg> =
 
-    let loadCmd = 
-        [ Cmd.fromAsync loadGenerics 
-          Cmd.fromAsync loadVersions
-        ] |> Cmd.batch
+    let loadCmd =
+        [ Cmd.fromAsync loadGenerics
+          Cmd.fromAsync loadVersions ]
+        |> Cmd.batch
 
     initialState, loadCmd
 
 
 let update (msg: Msg) (state: State): State * Cmd<Msg> =
     match msg with
-    | LoadVersions(Finished(Ok versions)) ->
-        { state with
-            Versions = Resolved versions }, Cmd.none
+    | LoadVersions(Finished(Ok versions)) -> { state with Versions = Resolved versions }, Cmd.none
 
     | LoadGenerics(Finished(Ok generics)) -> { state with Generics = Resolved generics }, Cmd.none
 
@@ -186,14 +182,12 @@ let update (msg: Msg) (state: State): State * Cmd<Msg> =
                       Generic = generic
                       Indication = state.SelectedIndication
                       Route = Some s }
-            
-            let cmds = 
-                [
-                    Cmd.fromAsync (loadMarkdown qry)
-                    match state.SelectedIndication with
-                    | Some indication ->
-                        Cmd.fromAsync (loadPatients generic indication s)
-                    | None -> () ]
+
+            let cmds =
+                [ Cmd.fromAsync (loadMarkdown qry)
+                  match state.SelectedIndication with
+                  | Some indication -> Cmd.fromAsync (loadPatients generic indication s)
+                  | None -> () ]
                 |> Cmd.batch
 
             { state with
@@ -223,7 +217,7 @@ let update (msg: Msg) (state: State): State * Cmd<Msg> =
                       Indication = state.SelectedIndication
                       Route = state.SelectedRoute
                       Patient = Some s }
-            
+
             { state with
                   SelectedPatient = Some s
                   Details = InProgress }, Cmd.fromAsync (loadMarkdown qry)
@@ -278,7 +272,7 @@ let render (state: State) (dispatch: Msg -> unit) =
                                 Label = sprintf "Kies een route (van %i totaal)" (routes |> List.length)
                                 Filter = Filter.StartsWith }
                           |> Autocomplete.render ] ]
-          | _ -> () 
+          | _ -> ()
 
           match state.Patients with
           | Resolved pats ->
@@ -287,12 +281,11 @@ let render (state: State) (dispatch: Msg -> unit) =
                     prop.children
                         [ { Autocomplete.props with
                                 Dispatch = SelectPatient >> dispatch
-                                Options = pats 
+                                Options = pats
                                 Label = sprintf "Kies een patient (van %i totaal)" (pats |> List.length)
                                 Filter = Filter.StartsWith }
                           |> Autocomplete.render ] ]
-          | _ -> () 
-        ]
+          | _ -> () ]
 
 
     let details =
@@ -324,20 +317,21 @@ let render (state: State) (dispatch: Msg -> unit) =
 
                                   match state.Versions with
                                   | Resolved versions ->
-                                    versions
-                                    |> List.sortBy fst
-                                    |> List.rev
-                                    |> List.head
-                                    |> (fun (v, d) -> sprintf " versie: %i (van %s)" v (d.ToString("dd-MM-yyyy")))
-                                    |> sprintf "Afspraken Programma Formularium %s"
-                                    |> prop.text
-                                  | _ ->
-                                    prop.text "Afspraken Programma Formularium" ]
+                                      versions
+                                      |> List.sortBy fst
+                                      |> List.rev
+                                      |> List.head
+                                      |> (fun (v, d) -> sprintf " versie: %i (van %s)" v (d.ToString("dd-MM-yyyy")))
+                                      |> sprintf "Afspraken Programma Formularium %s"
+                                      |> prop.text
+                                  | _ -> prop.text "Afspraken Programma Formularium" ]
                               Mui.iconButton
                                   [ prop.style [ style.color "white" ]
                                     prop.children [ Fable.MaterialUI.Icons.menuIcon "" ] ] ] ]
                     Mui.container
-                        [ prop.style [ style.marginTop 90; style.padding 10 ]
+                        [ prop.style
+                            [ style.marginTop 90
+                              style.padding 10 ]
                           prop.children
                               [ // search
                                 Html.div
@@ -348,8 +342,7 @@ let render (state: State) (dispatch: Msg -> unit) =
                                     // details
                                     Mui.paper
                                         [ prop.style
-                                            [ style.padding 10; style.color Colors.indigo.``900`` ]
-                                          prop.children [ details ] ] 
-                                | _ -> Html.none
-                             
-                              ] ] ] ] ]
+                                            [ style.padding 10
+                                              style.color Colors.indigo.``900`` ]
+                                          prop.children [ details ] ]
+                                | _ -> Html.none ] ] ] ] ]

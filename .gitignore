@@ -98,6 +98,8 @@ publishnuget.cmd
 !/docs/files/
 !/docs/files/img/
 !/docs/files/img/*.png
+!/docs/files/img/*.gif
+
 
 # data folder and files
 !/resources/

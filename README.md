@@ -1,4 +1,10 @@
-# SAFE Template
+# GenPed
+
+Application to show a local pediatric formulary database, as shown in a demo below.
+
+![img](docs/files/img/searching-formularium.gif)
+
+## SAFE Template is used to make this app
 
 This template can be used to generate a full-stack web application using the [SAFE Stack](https://safe-stack.github.io/). It was created using the dotnet [SAFE Template](https://safe-stack.github.io/docs/template-overview/). If you want to learn more about the template why not start with the [quick start](https://safe-stack.github.io/docs/quickstart/) guide?
 

@@ -9,6 +9,9 @@ open Shared.Api
 open Informedica.GenUtils.Lib
 open Informedica.GenUtils.Lib.BCL
 
+let getVersions = 
+    Memoization.memoize Doses.getVersions
+
 let getDoses =
     Memoization.memoize Doses.getDoses
 
@@ -46,23 +49,35 @@ let getRoutes connString generic indication =
     |> List.distinct
 
 
-let getMarkdown connString generic indication route =
+let getPatients connString generic indication route =
+    getDoses connString
+    |> List.filter (fun d -> d.Generic = generic && d.Indication = indication && d.Route = route)
+    |> List.sortBy Doses.sortPat
+    |> List.map (fun d -> d |> Doses.printPat, d)
+    |> List.map fst
+    |> List.distinct
+
+
+let getMarkdown connString generic indication route pat =
     let doses = getDoses connString
-    match indication, route with
-    | Some i, Some r ->
+    match indication, route, pat with
+    | Some i, Some r, Some p ->
         doses
         |> List.filter (fun d ->
             d.Generic = generic && 
             d.Indication |> String.equalsCapInsens i &&
             d.Route |> String.equalsCapInsens r
         )
-    | Some i, None ->
+        |> List.map (fun d -> d |> Doses.printPat, d)
+        |> List.filter (fst >> ((=) p))
+        |> List.map snd
+    | Some i, _, _ ->
         doses
         |> List.filter (fun d ->
             d.Generic = generic && 
             d.Indication |> String.equalsCapInsens i
         )
-    | None, _ ->
+    | None, _, _ ->
         doses
         |> List.filter (fun d ->
             d.Generic = generic
@@ -79,6 +94,17 @@ type ServerApi(logger: ILogger<ServerApi>, config: IConfiguration) =
         | true, s -> s
         | _ -> 
             config.GetValue("DATABASE_CONNECTIONSTRING_AP")
+
+    member this.GetVersions () =
+        async {
+            try
+                let versions = getVersions connString
+                return Ok versions
+            with
+                | error -> 
+                    logger.LogError(error, "Error while retrieving products from database")
+                    return Error error.Message               
+        }
         
     member this.GetProducts () = 
         async {
@@ -123,11 +149,22 @@ type ServerApi(logger: ILogger<ServerApi>, config: IConfiguration) =
                     return Error error.Message
         }
 
+    member this.GetPatients generic indication route =
+        async {
+            try
+                let pats = getPatients connString generic indication route
+                return Ok pats
+            with
+                | error -> 
+                    logger.LogError(error, "Error while retrieving patients from database")
+                    return Error error.Message
+        }
+
 
     member this.GetMarkdown (qry : Query) =
         async {
             try
-                let markdown = getMarkdown connString qry.Generic qry.Indication qry.Route
+                let markdown = getMarkdown connString qry.Generic qry.Indication qry.Route qry.Patient
                 return Ok markdown
             with
                 | error -> 
@@ -137,10 +174,12 @@ type ServerApi(logger: ILogger<ServerApi>, config: IConfiguration) =
 
     member this.Build() : IServerApi =
         {
+            GetVersions = this.GetVersions
             GetProducts = this.GetProducts
             GetGenerics = this.GetGenerics
             GetIndications = this.GetIndications
             GetRoutes = this.GetRoutes
+            GetPatients = this.GetPatients
             GetMarkdown = this.GetMarkdown
         }
 

@@ -6,6 +6,7 @@ module Queries =
 
     let getDoseLatest = "SELECT * FROM [dbo].[GetConfigMedDiscDoseLatest] ()"
     let getProductLatest = "SELECT * FROM [dbo].[GetConfigMedDiscLatest] ()"
+    let getVersions = "SELECT * FROM dbo.GetConfigMedDiscDoseVersions ()"
 
 open Types
 open Lib
@@ -43,7 +44,19 @@ let parseFreq s =
         }
         |> Some
     | _ -> None
-    
+
+
+let getVersions connString =
+    connString
+    |> Sql.connect
+    |> Sql.query Queries.getVersions
+    |> Sql.execute (fun r ->
+        r.int "VersionID",
+        r.dateTime "VersionDate"
+    )
+    |> function 
+    | Ok vs -> vs
+    | _ -> []
 
 let getProducts connString =
     connString
@@ -397,6 +410,7 @@ let printPat p =
 let toMarkdown (ds : Types.Dose list) =
     let generic_md = """
 # {generic}
+---
 """
 
     let route_md = """
@@ -411,6 +425,7 @@ let toMarkdown (ds : Types.Dose list) =
 
     let indication_md = """
 ## Indicatie: {indication}
+---
 """
 
     let dose_md = """

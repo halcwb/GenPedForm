@@ -16,7 +16,7 @@ open Microsoft.Extensions.Configuration
 open Serilog
 open Serilog.Core
 
-let solutionFile = "GenPed.sln"
+let solutionFile = "GenPedForm.sln"
 
 let isDevelopment =
 #if DEBUG

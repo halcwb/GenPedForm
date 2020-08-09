@@ -350,60 +350,69 @@ let printPat p =
             |> fun i ->
                 if i = 1 then sprintf "%A jaar" i
                 else sprintf "%A jaar" i
+    let gender = 
+        match p.Gender with
+        | Male -> "man"
+        | Female -> "vrouw"
+        | Unknown _ -> ""
 
-    match p.Gender with
-    | Male -> "man "
-    | Female -> "vrouw "
-    | Unknown _ -> ""
-    |> fun s ->
+    let age =
         match p.MinAgeMo, p.MaxAgeMo with
         | Some min, Some max ->
             let min = min |> printAge
             let max = max |> printAge
-            sprintf "%sleeftijd %s tot %s " s min max
+            sprintf "leeftijd %s tot %s"min max
         | Some min, None ->
             let min = min |> printAge
-            sprintf "%sleeftijd vanaf %s " s min
+            sprintf "leeftijd vanaf %s"min
         | None, Some max ->
             let max = max |> printAge
-            sprintf "%sleeftijd tot %s " s max
+            sprintf "leeftijd tot %s"max
         | _ -> ""
-        |> fun s ->
-            match p.MinGestAgeDays, p.MaxGestAgeDays, p.MinPMAgeDays, p.MaxPMAgeDays with
-            | Some min, Some max, _, _ ->
-                let min = min |> printDays
-                let max = max |> printDays
-                sprintf "%sneonaten zwangerschapsduur %s tot %s" s min max
-            | Some min, None, _, _ ->
-                let min = min |> printDays
-                sprintf "%sneonaten zwangerschapsduur vanaf %s" s min
-            | None, Some max, _, _ ->
-                let max = max |> printDays
-                sprintf "%sneonaten zwangerschapsduur tot %s" s max
-            | _, _, Some min, Some max ->
-                let min = min |> printDays
-                let max = max |> printDays
-                sprintf "%sneonaten postconceptie leeftijd %s tot %s" s min max
-            | _, _, Some min, None ->
-                let min = min |> printDays
-                sprintf "%sneonaten postconceptie leeftijd vanaf %s" s min
-            | _, _, None, Some max ->
-                let max = max |> printDays
-                sprintf "%sneonaten postconceptie leeftijd tot %s" s max
-            | _ -> s
-            |> fun s ->
-                let toStr v =
-                    if (v |> int |> float) = v then v |> int |> sprintf "%i"
-                    else v |> sprintf "%A"
 
-                match p.MinWeightKg, p.MaxWeightKg with
-                | Some min, Some max -> sprintf "gewicht %s tot %s kg" (min |> toStr) (max |> toStr)
-                | Some min, None     -> sprintf "gewicht vanaf %s kg" (min |> toStr)
-                | None,     Some max -> sprintf "gewicht tot %s kg" (max |> toStr)
-                | None,     None     -> ""
-                |> sprintf "%s %s" s
-                |> String.trim
+    let neonate =
+        match p.MinGestAgeDays, p.MaxGestAgeDays, p.MinPMAgeDays, p.MaxPMAgeDays with
+        | Some min, Some max, _, _ ->
+            let min = min |> printDays
+            let max = max |> printDays
+            sprintf "neonaten zwangerschapsduur %s tot %s" min max
+        | Some min, None, _, _ ->
+            let min = min |> printDays
+            sprintf "neonaten zwangerschapsduur vanaf %s" min
+        | None, Some max, _, _ ->
+            let max = max |> printDays
+            sprintf "neonaten zwangerschapsduur tot %s" max
+        | _, _, Some min, Some max ->
+            let min = min |> printDays
+            let max = max |> printDays
+            sprintf "neonaten postconceptie leeftijd %s tot %s" min max
+        | _, _, Some min, None ->
+            let min = min |> printDays
+            sprintf "neonaten postconceptie leeftijd vanaf %s" min
+        | _, _, None, Some max ->
+            let max = max |> printDays
+            sprintf "neonaten postconceptie leeftijd tot %s" max
+        | _ -> ""
 
+    let weight =
+        let toStr v =
+            if (v |> int |> float) = v then v |> int |> sprintf "%i"
+            else v |> sprintf "%A"
+
+        match p.MinWeightKg, p.MaxWeightKg with
+        | Some min, Some max -> sprintf "gewicht %s tot %s kg" (min |> toStr) (max |> toStr)
+        | Some min, None     -> sprintf "gewicht vanaf %s kg" (min |> toStr)
+        | None,     Some max -> sprintf "gewicht tot %s kg" (max |> toStr)
+        | None,     None     -> ""
+
+    [
+        gender
+        neonate
+        age
+        weight
+    ]
+    |> List.filter (String.isNullOrWhiteSpace >> not)
+    |> String.concat ", "
 
 /// See for use of anonymous record in 
 /// fold: https://github.com/dotnet/fsharp/issues/6699

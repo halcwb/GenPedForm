@@ -60,28 +60,36 @@ let getPatients connString generic indication route =
 
 let getMarkdown connString generic indication route pat =
     let doses = getDoses connString
-    match indication, route, pat with
-    | Some i, Some r, Some p ->
+    match generic, indication, route, pat with
+    | Some g, Some i, Some r, Some p ->
         doses
         |> List.filter (fun d ->
-            d.Generic = generic && 
+            d.Generic = g && 
             d.Indication |> String.equalsCapInsens i &&
             d.Route |> String.equalsCapInsens r
         )
         |> List.map (fun d -> d |> Doses.printPat, d)
         |> List.filter (fst >> ((=) p))
         |> List.map snd
-    | Some i, _, _ ->
+    | Some g, Some i, Some r, None ->
         doses
         |> List.filter (fun d ->
-            d.Generic = generic && 
+            d.Generic = g && 
+            d.Indication |> String.equalsCapInsens i &&
+            d.Route |> String.equalsCapInsens r
+        )
+    | Some g, Some i, _, _ ->
+        doses
+        |> List.filter (fun d ->
+            d.Generic = g && 
             d.Indication |> String.equalsCapInsens i
         )
-    | None, _, _ ->
+    | Some g, None, _, _ ->
         doses
         |> List.filter (fun d ->
-            d.Generic = generic
+            d.Generic = g
         )
+    | None, _, _, _ -> []
     |> Doses.toMarkdown
 
 

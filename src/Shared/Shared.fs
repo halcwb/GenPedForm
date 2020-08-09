@@ -22,7 +22,7 @@ type Products = string list
 type Generics = string list
 
 type Query =
-    { Generic : string
+    { Generic : string option
       Indication : string option
       Route : string option
       Patient : string option }

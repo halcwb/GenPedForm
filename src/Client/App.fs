@@ -39,41 +39,54 @@ type Msg =
     | SelectRoute of string
     | SelectPatient of string
 
-let qry: Query =
-    { Generic = ""
-      Indication = None
-      Route = None
-      Patient = None }
 
-let loadVersions =
-    async {
-        let! versions = Server.api.GetVersions()
-        return LoadVersions(Finished versions) }
+module LoadCommands =
 
-let loadGenerics =
-    async {
-        let! generics = Server.api.GetGenerics()
-        return LoadGenerics(Finished generics) }
+    let qry: Query =
+        { Generic = None
+          Indication = None
+          Route = None
+          Patient = None }
 
-let loadIndications generic =
-    async {
-        let! indications = Server.api.GetIndications generic
-        return LoadIndications(Finished indications) }
+    let loadVersions =
+        async {
+            let! versions = Server.api.GetVersions()
+            return LoadVersions(Finished versions) } |> Cmd.fromAsync
 
-let loadRoutes generic indication =
-    async {
-        let! routes = Server.api.GetRoutes generic indication
-        return LoadRoutes(Finished routes) }
+    let loadGenerics =
+        async {
+            let! generics = Server.api.GetGenerics()
+            return LoadGenerics(Finished generics) } |> Cmd.fromAsync
 
-let loadPatients generic indication route =
-    async {
-        let! pats = Server.api.GetPatients generic indication route
-        return LoadPatients(Finished pats) }
+    let loadIndications generic =
+        match generic with
+        | Some g ->
+            async {
+                let! indications = Server.api.GetIndications g
+                return LoadIndications(Finished indications) } |> Cmd.fromAsync
+        | None -> Cmd.none
 
-let loadMarkdown qry =
-    async {
-        let! details = Server.api.GetMarkdown qry
-        return LoadMarkdown(Finished details) }
+    let loadRoutes generic indication =
+        match generic, indication with
+        | Some g, Some i ->
+            async {
+                let! routes = Server.api.GetRoutes g i
+                return LoadRoutes(Finished routes) } |> Cmd.fromAsync
+        | _ -> Cmd.none
+
+
+    let loadPatients generic indication route =
+        match generic, indication, route with
+        | Some g, Some i, Some r ->
+            async {
+                let! pats = Server.api.GetPatients g i r
+                return LoadPatients(Finished pats) } |> Cmd.fromAsync
+        | _ -> Cmd.none
+
+    let loadMarkdown qry =
+        async {
+            let! details = Server.api.GetMarkdown qry
+            return LoadMarkdown(Finished details) } |> Cmd.fromAsync
 
 
 let initialState =
@@ -90,10 +103,7 @@ let initialState =
 
 let init(): State * Cmd<Msg> =
 
-    let loadCmd =
-        [ Cmd.fromAsync loadGenerics
-          Cmd.fromAsync loadVersions ]
-        |> Cmd.batch
+    let loadCmd = [ LoadCommands.loadGenerics; LoadCommands.loadVersions ] |> Cmd.batch
 
     initialState, loadCmd
 
@@ -102,191 +112,273 @@ let update (msg: Msg) (state: State): State * Cmd<Msg> =
     match msg with
     | LoadVersions(Finished(Ok versions)) -> { state with Versions = Resolved versions }, Cmd.none
 
-    | LoadGenerics(Finished(Ok generics)) -> { state with Generics = Resolved generics }, Cmd.none
+    | LoadGenerics(Finished(Ok generics)) ->
+        let state =
+            { state with
+                  SelectedIndication = generics |> List.tryExactlyOne
+                  Generics = Resolved generics }
 
-    | SelectGeneric s ->
-        if s <> "" then
-            let qry = { qry with Generic = s }
+        let state, cmds =
+            if state.SelectedGeneric |> Option.isNone then
+                state, []
+            else
+                { state with
+                      Indications = InProgress
+                      Routes = HasNotStartedYet
+                      Patients = HasNotStartedYet
+                      Details = InProgress },
+                [ { LoadCommands.qry with Generic = state.SelectedGeneric } |> LoadCommands.loadMarkdown
+
+                  LoadCommands.loadIndications state.SelectedGeneric ]
+                |> Cmd.batch
+
+        state, cmds
+
+    | LoadIndications(Finished(Ok indications)) ->
+        let state =
+            { state with
+                  SelectedIndication = indications |> List.tryExactlyOne
+                  Indications = Resolved indications
+                  Routes = InProgress }
+
+        let state, cmds =
+            if state.SelectedIndication |> Option.isNone then
+                state, Cmd.none
+            else
+                { state with
+                      Routes = InProgress
+                      Patients = HasNotStartedYet
+                      Details = InProgress },
+                [ { LoadCommands.qry with
+                        Generic = state.SelectedGeneric
+                        Indication = state.SelectedIndication }
+                  |> LoadCommands.loadMarkdown
+
+                  LoadCommands.loadRoutes state.SelectedGeneric state.SelectedIndication ]
+                |> Cmd.batch
+
+        state, cmds
+
+    | LoadRoutes(Finished(Ok routes)) ->
+        let state =
+            { state with
+                  SelectedRoute = routes |> List.tryExactlyOne
+                  Routes = Resolved routes }
+
+        let state, cmds =
+            if state.SelectedRoute |> Option.isNone then
+                state, Cmd.none
+            else
+                { state with
+                      Patients = InProgress
+                      Details = InProgress },
+                [ { LoadCommands.qry with
+                        Generic = state.SelectedGeneric
+                        Indication = state.SelectedIndication
+                        Route = state.SelectedRoute }
+                  |> LoadCommands.loadMarkdown
+
+                  LoadCommands.loadPatients state.SelectedGeneric state.SelectedIndication state.SelectedRoute ]
+                |> Cmd.batch
+
+        state, cmds
+
+    | LoadPatients(Finished(Ok pats)) ->
+        let state =
+            { state with
+                  SelectedPatient = pats |> List.tryExactlyOne
+                  Patients = Resolved pats }
+
+
+        let state, cmds =
+            if state.SelectedPatient |> Option.isNone then
+                state, Cmd.none
+            else
+                { state with Details = InProgress },
+                [ { LoadCommands.qry with
+                        Generic = state.SelectedGeneric
+                        Indication = state.SelectedIndication
+                        Route = state.SelectedRoute
+                        Patient = state.SelectedPatient }
+                  |> LoadCommands.loadMarkdown ]
+                |> Cmd.batch
+
+        state, cmds
+
+    | LoadMarkdown(Finished(Ok s)) -> { state with Details = Resolved s }, Cmd.none
+
+    | SelectGeneric generic ->
+        if generic <> "" then
+            let qry = { LoadCommands.qry with Generic = (Some generic) }
 
             let cmds =
-                [ Cmd.fromAsync (loadMarkdown qry)
-                  Cmd.fromAsync (loadIndications s) ]
+                [ LoadCommands.loadMarkdown qry
+                  LoadCommands.loadIndications (Some generic) ]
                 |> Cmd.batch
 
             { state with
-                  SelectedGeneric = Some s
+                  SelectedGeneric = Some generic
                   SelectedIndication = None
+                  SelectedRoute = None
+                  SelectedPatient = None
                   Indications = InProgress
                   Routes = HasNotStartedYet
+                  Patients = HasNotStartedYet
                   Details = InProgress }, cmds
         else
-            { state with
-                  SelectedGeneric = None
-                  SelectedIndication = None
-                  Indications = HasNotStartedYet
-                  Routes = HasNotStartedYet
-                  Patients = HasNotStartedYet
-                  Details = HasNotStartedYet }, Cmd.none
+            { initialState with
+                Versions = state.Versions
+                Generics = state.Generics }, Cmd.none
 
-    | SelectIndication s ->
-        match state.SelectedGeneric with
-        | Some generic when s = "" ->
-            let qry = { qry with Generic = generic }
+    | SelectIndication indication ->
+        if indication = "" then
+            let qry = { LoadCommands.qry with Generic = state.SelectedGeneric }
 
             { state with
                   SelectedIndication = None
                   Routes = HasNotStartedYet
                   Patients = HasNotStartedYet
-                  Details = InProgress }, Cmd.fromAsync (loadMarkdown qry)
+                  Details = InProgress }, LoadCommands.loadMarkdown qry
 
-        | Some generic ->
+        else
             let qry =
-                { qry with
-                      Generic = generic
-                      Indication = Some s }
+                { LoadCommands.qry with
+                      Generic = state.SelectedGeneric
+                      Indication = Some indication }
 
             let cmds =
-                [ Cmd.fromAsync (loadMarkdown qry)
-                  Cmd.fromAsync (loadRoutes generic s) ]
+                [ LoadCommands.loadMarkdown qry
+                  LoadCommands.loadRoutes state.SelectedGeneric (Some indication) ]
                 |> Cmd.batch
 
             { state with
-                  SelectedIndication = Some s
+                  SelectedIndication = Some indication
                   Routes = InProgress
                   Patients = HasNotStartedYet
                   Details = InProgress }, cmds
-        | None ->
-            { state with
-                  SelectedIndication = None
-                  SelectedRoute = None
-                  Indications = HasNotStartedYet
-                  Routes = HasNotStartedYet
-                  Patients = HasNotStartedYet }, Cmd.none
 
-    | SelectRoute s ->
-        match state.SelectedGeneric with
-        | Some generic when s = "" ->
+    | SelectRoute route ->
+        if route = "" then
             let qry =
-                { qry with
-                      Generic = generic
+                { LoadCommands.qry with
+                      Generic = state.SelectedGeneric
                       Indication = state.SelectedIndication }
 
             { state with
                   SelectedRoute = None
                   Patients = HasNotStartedYet
-                  Details = InProgress }, Cmd.fromAsync (loadMarkdown qry)
+                  Details = InProgress }, LoadCommands.loadMarkdown qry
 
-        | Some generic ->
+        else
             let qry =
-                { qry with
-                      Generic = generic
+                { LoadCommands.qry with
+                      Generic = state.SelectedGeneric
                       Indication = state.SelectedIndication
-                      Route = Some s }
+                      Route = Some route }
 
             let cmds =
-                [ Cmd.fromAsync (loadMarkdown qry)
-                  match state.SelectedIndication with
-                  | Some indication -> Cmd.fromAsync (loadPatients generic indication s)
-                  | None -> () ]
+                [ LoadCommands.loadMarkdown qry
+                  LoadCommands.loadPatients state.SelectedGeneric state.SelectedIndication (Some route) ]
                 |> Cmd.batch
 
             { state with
-                  SelectedRoute = Some s
+                  SelectedRoute = Some route
                   Patients = InProgress
                   Details = InProgress }, cmds
 
-        | None -> state, Cmd.none
 
-    | SelectPatient s ->
-        match state.SelectedGeneric with
-        | Some generic when s = "" ->
+    | SelectPatient patient ->
+        if patient = "" then
             let qry =
-                { qry with
-                      Generic = generic
+                { LoadCommands.qry with
+                      Generic = state.SelectedGeneric
                       Indication = state.SelectedIndication
                       Route = state.SelectedRoute }
 
             { state with
                   SelectedPatient = None
-                  Details = InProgress }, Cmd.fromAsync (loadMarkdown qry)
+                  Details = InProgress }, LoadCommands.loadMarkdown qry
 
-        | Some generic ->
+        else
             let qry =
-                { qry with
-                      Generic = generic
+                { LoadCommands.qry with
+                      Generic = state.SelectedGeneric
                       Indication = state.SelectedIndication
                       Route = state.SelectedRoute
-                      Patient = Some s }
+                      Patient = Some patient }
 
             { state with
-                  SelectedPatient = Some s
-                  Details = InProgress }, Cmd.fromAsync (loadMarkdown qry)
-
-        | None -> state, Cmd.none
-
-    | LoadMarkdown(Finished(Ok s)) -> { state with Details = Resolved s }, Cmd.none
-
-    | LoadIndications(Finished(Ok indications)) -> { state with Indications = Resolved indications }, Cmd.none
-
-    | LoadRoutes(Finished(Ok routes)) -> { state with Routes = Resolved routes }, Cmd.none
-
-    | LoadPatients(Finished(Ok pats)) -> { state with Patients = Resolved pats }, Cmd.none
+                  SelectedPatient = Some patient
+                  Details = InProgress }, LoadCommands.loadMarkdown qry
 
     | _ -> state, Cmd.none
 
 
+let printTitle (versions: Deferred<(int * DateTime) list>) =
+    match versions with
+    | Resolved versions ->
+        versions
+        |> List.sortBy fst
+        |> List.rev
+        |> List.head
+        |> (fun (v, d) -> sprintf " (versie: %i, %s)" v (d.ToString("dd-MM-yyyy")))
+        |> sprintf "Afspraken Programma Formularium %s"
+    | _ -> "Afspraken Programma Formularium"
+
+
+let createFilter generics indications routes patients dispatch =
+    [ match generics with
+      | Resolved generics ->
+          { Autocomplete.props with
+                Dispatch = (SelectGeneric >> dispatch)
+                Options = generics |> List.sort
+                Label = sprintf "Zoek een generiek (van %i totaal)" (generics |> List.length)
+                Filter = Filter.StartsWith }
+          |> Autocomplete.render
+      | _ -> ()
+
+      match indications with
+      | Resolved indications ->
+          Html.div
+              [ prop.style [ style.marginTop 20 ]
+                prop.children
+                    [ { Autocomplete.props with
+                            Dispatch = SelectIndication >> dispatch
+                            Options = indications |> List.sort
+                            Label = sprintf "Kies een indicatie (van %i totaal)" (indications |> List.length)
+                            Filter = Filter.ContainsCaseSensitive }
+                      |> Autocomplete.render ] ]
+
+      | _ -> ()
+
+      match routes with
+      | Resolved routes ->
+          Html.div
+              [ prop.style [ style.marginTop 20 ]
+                prop.children
+                    [ { Autocomplete.props with
+                            Dispatch = SelectRoute >> dispatch
+                            Options = routes |> List.sort
+                            Label = sprintf "Kies een route (van %i totaal)" (routes |> List.length)
+                            Filter = Filter.StartsWith }
+                      |> Autocomplete.render ] ]
+      | _ -> ()
+
+      match patients with
+      | Resolved pats ->
+          Html.div
+              [ prop.style [ style.marginTop 20 ]
+                prop.children
+                    [ { Autocomplete.props with
+                            Dispatch = SelectPatient >> dispatch
+                            Options = pats
+                            Label = sprintf "Kies een patient (van %i totaal)" (pats |> List.length)
+                            Filter = Filter.StartsWith }
+                      |> Autocomplete.render ] ]
+      | _ -> () ]
+
 let render (state: State) (dispatch: Msg -> unit) =
-    let filter =
-        [ match state.Generics with
-          | Resolved generics ->
-              { Autocomplete.props with
-                    Dispatch = (SelectGeneric >> dispatch)
-                    Options = generics |> List.sort
-                    Label = sprintf "Zoek een generiek (van %i totaal)" (generics |> List.length)
-                    Filter = Filter.StartsWith }
-              |> Autocomplete.render
-          | _ -> ()
-
-          match state.Indications with
-          | Resolved indications ->
-              Html.div
-                  [ prop.style [ style.marginTop 20 ]
-                    prop.children
-                        [ { Autocomplete.props with
-                                Dispatch = SelectIndication >> dispatch
-                                Options = indications |> List.sort
-                                Label = sprintf "Kies een indicatie (van %i totaal)" (indications |> List.length)
-                                Filter = Filter.ContainsCaseSensitive }
-                          |> Autocomplete.render ] ]
-
-          | _ -> ()
-
-          match state.Routes with
-          | Resolved routes ->
-              Html.div
-                  [ prop.style [ style.marginTop 20 ]
-                    prop.children
-                        [ { Autocomplete.props with
-                                Dispatch = SelectRoute >> dispatch
-                                Options = routes |> List.sort
-                                Label = sprintf "Kies een route (van %i totaal)" (routes |> List.length)
-                                Filter = Filter.StartsWith }
-                          |> Autocomplete.render ] ]
-          | _ -> ()
-
-          match state.Patients with
-          | Resolved pats ->
-              Html.div
-                  [ prop.style [ style.marginTop 20 ]
-                    prop.children
-                        [ { Autocomplete.props with
-                                Dispatch = SelectPatient >> dispatch
-                                Options = pats
-                                Label = sprintf "Kies een patient (van %i totaal)" (pats |> List.length)
-                                Filter = Filter.StartsWith }
-                          |> Autocomplete.render ] ]
-          | _ -> () ]
-
+    let filter = createFilter state.Generics state.Indications state.Routes state.Patients dispatch
 
     let details =
         match state.Details with
@@ -302,36 +394,14 @@ let render (state: State) (dispatch: Msg -> unit) =
         [ themeProvider.theme defaultTheme
           themeProvider.children
               [ Html.div
-                  [ Mui.appBar
-                      [ prop.style
-                          [ style.display.flex
-                            style.flexDirection.row
-                            style.padding 10 ]
-                        appBar.variant.elevation
-                        appBar.children
-                            [ Mui.typography
-                                [ prop.style
-                                    [ style.flexGrow 1
-                                      style.padding 10 ]
-                                  typography.variant.h6
+                  [ [ Fable.MaterialUI.Icons.menuIcon "", ignore ]
+                    |> Components.TitleBar.render (state.Versions |> printTitle)
 
-                                  match state.Versions with
-                                  | Resolved versions ->
-                                      versions
-                                      |> List.sortBy fst
-                                      |> List.rev
-                                      |> List.head
-                                      |> (fun (v, d) -> sprintf " versie: %i (van %s)" v (d.ToString("dd-MM-yyyy")))
-                                      |> sprintf "Afspraken Programma Formularium %s"
-                                      |> prop.text
-                                  | _ -> prop.text "Afspraken Programma Formularium" ]
-                              Mui.iconButton
-                                  [ prop.style [ style.color "white" ]
-                                    prop.children [ Fable.MaterialUI.Icons.menuIcon "" ] ] ] ]
                     Mui.container
                         [ prop.style
                             [ style.marginTop 90
                               style.padding 10 ]
+                          container.maxWidth.md
                           prop.children
                               [ // search
                                 Html.div

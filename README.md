@@ -1,4 +1,4 @@
-# GenPed
+# GenPedForm
 
 Application to show a local pediatric formulary database, as shown in a demo below.
 

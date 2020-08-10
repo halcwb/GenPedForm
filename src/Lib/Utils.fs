@@ -173,12 +173,46 @@ module String =
         (regex "\[[^\]]*]").Replace(s, "")
 
 
+    let removeTrailing chars (s : String) =
+        s
+        |> Seq.rev
+        |> Seq.map string
+        |> Seq.skipWhile (fun c ->
+            chars |> Seq.exists ((=) c)
+        )
+        |> Seq.rev
+        |> String.concat ""
+
+
+    let removeTrailingZerosFromDutchNumber (s : string) =
+        s.Split([|","|], StringSplitOptions.None)
+        |> function 
+        | [|n; d|] -> 
+            let d = d |> removeTrailing ["0"]
+            n + "," + d     
+        | _ -> s
+        
+
 module Int32 =
 
     open System
+    open System.Globalization
 
     let parse s = Int32.Parse(s, Globalization.CultureInfo.InvariantCulture)
 
     let tryParse (s : string) =
         let (b, n) = Int32.TryParse(s)
         if b then n |> Some else None
+
+    let toStringNumberNL (n: int) = n.ToString("N0", CultureInfo.GetCultureInfo("nl"))
+
+
+module Double =
+
+    open System
+    open System.Globalization
+
+    let toStringNumberNL p (n: float) = n.ToString("R" + p, CultureInfo.GetCultureInfo("nl"))
+
+    let toStringNumberNLWithoutTrailingZeros = 
+        toStringNumberNL "" >> String.removeTrailingZerosFromDutchNumber

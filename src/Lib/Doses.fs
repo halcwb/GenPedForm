@@ -206,11 +206,16 @@ let sortPat (d: Dose) =
 
 let printDose (d : Dose) =
     let format d =
+        let itostr = Int32.toStringNumberNL
+        let dtostr = Double.toStringNumberNLWithoutTrailingZeros
         d 
-        |> Double.fixPrecision 3
         |> fun d ->
-            if (d |> int |> float) = d then sprintf "%A" (d |> int) 
-            else d |> sprintf "%A"
+            if (d |> int |> float) = d then 
+                sprintf "%s" (d |> int |> itostr) 
+            else 
+                d 
+                |> dtostr
+                |> sprintf "%s"
 
     let printQ u = function
     | Quantity q -> 

@@ -34,6 +34,7 @@ type Dose =
         MaxDose : DoseQuantity option
         AbsMaxDose : DoseQuantity option
         MaxPerDose : DoseQuantity option
+        StartDose : DoseQuantity option
         Products : Product list
     }
 

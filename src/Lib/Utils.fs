@@ -216,3 +216,28 @@ module Double =
 
     let toStringNumberNLWithoutTrailingZeros = 
         toStringNumberNL "" >> String.removeTrailingZerosFromDutchNumber
+
+
+module Environment =
+
+    open System
+    open System.Collections.Generic
+
+    /// Returns enviroment variables as a dictionary
+    let environmentVars() =
+        let variables = Dictionary<string, string>()
+        let userVariables = Environment.GetEnvironmentVariables(EnvironmentVariableTarget.User)
+        let processVariables = Environment.GetEnvironmentVariables(EnvironmentVariableTarget.Process)
+        for pair in userVariables do
+            let variable = unbox<Collections.DictionaryEntry> pair
+            let key = unbox<string> variable.Key
+            let value = unbox<string> variable.Value
+            if not (variables.ContainsKey(key)) && key <> "PATH" then variables.Add(key, value)
+        for pair in processVariables do
+            let variable = unbox<Collections.DictionaryEntry> pair
+            let key = unbox<string> variable.Key
+            let value = unbox<string> variable.Value
+            if not (variables.ContainsKey(key)) && key <> "PATH" then variables.Add(key, value)
+        variables
+    
+    

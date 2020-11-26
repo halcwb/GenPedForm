@@ -12,6 +12,7 @@ group Library
 
     nuget FSharp.Data
     nuget Microsoft.Data.SqlClient 
+    nuget DustyTables
 
 group Server
     source https://api.nuget.org/v3/index.json

@@ -9,9 +9,9 @@ module Queries =
     let getVersions = "SELECT * FROM dbo.GetConfigMedDiscDoseVersions ()"
 
 open Types
-open Lib
 open Utils
 open Informedica.GenUtils.Lib.BCL
+open DustyTables
 
 let (|Regex|_|) pattern input =
     let m = (String.regex pattern).Match(input) // Regex.Match(input, pattern)
@@ -157,6 +157,7 @@ let getDoses connString : Dose list =
                     if v = 0. then None
                     else v |> Quantity |> Some
                 )
+            StartDose = None
             Products = []
         }
     )
@@ -325,7 +326,15 @@ let printFreqs (fs : Frequency list) =
 
 
 
-let printPat p =
+let printPatCat gender 
+                minAgeMo 
+                maxAgeMo 
+                minGestAgeDays 
+                maxGestAgeDays 
+                minPMAgeDays 
+                maxPMAgeDays 
+                minWeightKg 
+                maxWeightKg =
     let printDays d =
         (d / 7) |> sprintf "%A weken"
 
@@ -355,14 +364,15 @@ let printPat p =
             |> fun i ->
                 if i = 1 then sprintf "%A jaar" i
                 else sprintf "%A jaar" i
+    
     let gender = 
-        match p.Gender with
+        match gender with
         | Male -> "man"
         | Female -> "vrouw"
         | Unknown _ -> ""
 
     let age =
-        match p.MinAgeMo, p.MaxAgeMo with
+        match minAgeMo, maxAgeMo with
         | Some min, Some max ->
             let min = min |> printAge
             let max = max |> printAge
@@ -376,7 +386,7 @@ let printPat p =
         | _ -> ""
 
     let neonate =
-        match p.MinGestAgeDays, p.MaxGestAgeDays, p.MinPMAgeDays, p.MaxPMAgeDays with
+        match minGestAgeDays, maxGestAgeDays, minPMAgeDays, maxPMAgeDays with
         | Some min, Some max, _, _ ->
             let min = min |> printDays
             let max = max |> printDays
@@ -404,7 +414,7 @@ let printPat p =
             if (v |> int |> float) = v then v |> int |> sprintf "%i"
             else v |> sprintf "%A"
 
-        match p.MinWeightKg, p.MaxWeightKg with
+        match minWeightKg, maxWeightKg with
         | Some min, Some max -> sprintf "gewicht %s tot %s kg" (min |> toStr) (max |> toStr)
         | Some min, None     -> sprintf "gewicht vanaf %s kg" (min |> toStr)
         | None,     Some max -> sprintf "gewicht tot %s kg" (max |> toStr)
@@ -418,6 +428,21 @@ let printPat p =
     ]
     |> List.filter (String.isNullOrWhiteSpace >> not)
     |> String.concat ", "
+
+
+
+let printPat (d : Dose) =
+    printPatCat
+        d.Gender
+        d.MinAgeMo 
+        d.MaxAgeMo 
+        d.MinGestAgeDays 
+        d.MaxGestAgeDays 
+        d.MinPMAgeDays 
+        d.MaxPMAgeDays 
+        d.MinWeightKg 
+        d.MaxWeightKg
+
 
 /// See for use of anonymous record in 
 /// fold: https://github.com/dotnet/fsharp/issues/6699

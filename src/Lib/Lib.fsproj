@@ -5,11 +5,13 @@
     </PropertyGroup>
     <ItemGroup>
         <None Include="Scripts\Categorize.fsx" />
+        <None Include="Scripts\Categorize2.fsx" />
         <None Include="Scripts\DustyTables.fsx" />
         <None Include="Scripts/Scripts.fsx" />
         <Compile Include="Utils.fs" />
         <Compile Include="Types.fs" />
         <Compile Include="Doses.fs" />
+        <Compile Include="Categorize.fs" />
         <None Include="paket.references" />
     </ItemGroup>
     <Import Project="..\..\.paket\Paket.Restore.targets" />

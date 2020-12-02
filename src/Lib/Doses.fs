@@ -13,6 +13,35 @@ open Utils
 open Informedica.GenUtils.Lib.BCL
 open DustyTables
 
+
+let dose =
+    {
+        Generic = ""
+        Shape = ""
+        Route = ""
+        Indication = ""
+        Specialty = ""
+        Gender = Unknown ""
+        MinAgeMo = None
+        MaxAgeMo = None
+        MinWeightKg = None
+        MaxWeightKg = None
+        MinGestAgeDays = None
+        MaxGestAgeDays = None
+        MinPMAgeDays = None
+        MaxPMAgeDays = None
+        Freqs = []
+        Unit = ""
+        NormDose = None
+        MinDose = None
+        MaxDose = None
+        AbsMaxDose = None
+        MaxPerDose = None
+        StartDose = None
+        Products = []
+    }
+    
+
 let (|Regex|_|) pattern input =
     let m = (String.regex pattern).Match(input) // Regex.Match(input, pattern)
     if m.Success then 
@@ -325,6 +354,37 @@ let printFreqs (fs : Frequency list) =
     |> String.concat ", "
 
 
+let printAge a =
+    match a with
+    | _ when ((a * 31.) / 7.) < 1. ->
+        (a * 31.)
+        |> int
+        |> fun i ->
+            if i = 1 then sprintf "%A dag" i
+            else sprintf "%A dagen" i
+    | _ when a < 1. ->
+        ((a * 31.) / 7.)
+        |> int
+        |> fun i ->
+            if i = 1 then sprintf "%A week" i
+            else sprintf "%A weken" i
+    | _ when a < 12. ->
+        a
+        |> int
+        |> fun i ->
+            if i = 1 then sprintf "%A maand" i
+            else sprintf "%A maanden" i
+    | _ ->
+        (a / 12.)
+        |> int
+        |> fun i ->
+            if i = 1 then sprintf "%A jaar" i
+            else sprintf "%A jaar" i
+
+            
+let printDays d =
+    (d / 7) |> sprintf "%A weken"
+
 
 let printPatCat gender 
                 minAgeMo 
@@ -335,35 +395,6 @@ let printPatCat gender
                 maxPMAgeDays 
                 minWeightKg 
                 maxWeightKg =
-    let printDays d =
-        (d / 7) |> sprintf "%A weken"
-
-    let printAge a =
-        match a with
-        | _ when ((a * 31.) / 7.) < 1. ->
-            (a * 31.)
-            |> int
-            |> fun i ->
-                if i = 1 then sprintf "%A dag" i
-                else sprintf "%A dagen" i
-        | _ when a < 1. ->
-            ((a * 31.) / 7.)
-            |> int
-            |> fun i ->
-                if i = 1 then sprintf "%A week" i
-                else sprintf "%A weken" i
-        | _ when a < 12. ->
-            a
-            |> int
-            |> fun i ->
-                if i = 1 then sprintf "%A maand" i
-                else sprintf "%A maanden" i
-        | _ ->
-            (a / 12.)
-            |> int
-            |> fun i ->
-                if i = 1 then sprintf "%A jaar" i
-                else sprintf "%A jaar" i
     
     let gender = 
         match gender with

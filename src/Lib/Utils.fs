@@ -240,4 +240,36 @@ module Environment =
             if not (variables.ContainsKey(key)) && key <> "PATH" then variables.Add(key, value)
         variables
     
-    
+
+module List = 
+
+    let isSubList xs1 xs2 =
+        let c1 = xs1 |> List.length
+        let c2 = xs2 |> List.length
+
+        if c1 < c2 || (c1 = 0) || (c2 = 0) then false
+        else
+            [c2 .. c1]
+            |> List.fold (fun acc _ ->
+                let b =
+                    (acc |> snd) ||
+                    xs1
+                    |> List.skip (acc |> fst)
+                    |> List.take c2
+                    |> ((=) xs2)
+                ((acc |> fst) + 1, b)
+            ) (0, false)
+            |> snd
+
+
+    let isTailList xs1 xs2 =
+        let c1 = xs1 |> List.length
+        let c2 = xs2 |> List.length
+
+        if c1 < c2 || (c1 = 0) || (c2 = 0) then false
+        else
+            xs1
+            |> List.rev
+            |> List.take c2
+            |> List.rev 
+            |> ((=) xs2)

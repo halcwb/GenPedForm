@@ -228,11 +228,11 @@ let replaceCategory pc =
     |> applyMap
 
 
-let applyCollect f pcs (Category(pc', cod)) =
+let applyCollect f pcs c =
     let rec apply current pcs (Category(pc', cod)) =
         let current = current @ [pc']
         if pcs |> findCatIn current then 
-            pcs |> List.tail |> f cod 
+            f (c |> findParent pcs) 
         else [ (Category(pc', cod)) ]
         |> List.collect (fun (Category(pc', cod)) ->
             match cod with
@@ -246,12 +246,15 @@ let applyCollect f pcs (Category(pc', cod)) =
                 |> List.singleton
         )
 
-    match cod with
-    | Dose _ -> Category(pc', cod)
+    match c |> getCategoryChildren with
+    | Dose _ -> c
     | Categories cs ->
         cs
         |> List.collect (apply [] pcs)
-        |> fun cs -> pc' |> createCategory cs
+        |> fun cs -> 
+            c
+            |> getCategoryPatient
+            |> createCategory cs
 
 
 let addGenderCategory pc c =
@@ -349,13 +352,28 @@ let splitMinMaxCategory pcs f b c =
         |> splitMinMax f b
         |> List.map (fc >> (createCategory []))
         |> fun xs -> 
-            let f _ _ = xs
+            let f _ = xs
             applyCollect f pcs c
     | _ -> c
 
 
 let removeCategory =
-    fun _ pcs -> []
+    fun p ->
+        p
+        |> function
+        | None   -> "no parent"
+        | Some c ->
+            c
+            |> getCategoryChildren
+            |> function
+            | Dose _ -> "dose"
+            | Categories cs ->
+                cs
+                |> List.map (getCategoryPatient >> patientToStr)
+                |> String.concat ";"
+        |> printfn "removing from %s"
+        []
+    
     |> applyCollect 
 
 
@@ -370,8 +388,8 @@ initCategory
 |> addWeightCategory (minMax |> setMaxIncl 10.)  [ Female |> Gender ] 
 |> splitMinMaxCategory [ Female |> Gender; minMax |> setMinExcl 10. |> Weight] 20. true
 |> fun x -> printfn "Start search"; x
-|> findParent [ RootCategory; Male |> Gender; minMax |> setMaxExcl 1. |> Age; minMax |> setMinIncl 36. |> GestationAge ]
-// |> removeCategory [ Female |> Gender ]
+//|> findParent [ RootCategory; Male |> Gender; minMax |> setMaxExcl 1. |> Age; minMax |> setMinIncl 36. |> GestationAge ]
+|> removeCategory [ Female |> Gender ]
 //|> addGenderCategory [ RootCategory ]
 |> toString
 |> printfn "%s"

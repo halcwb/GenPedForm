@@ -107,7 +107,7 @@ let toString (Category(_, cod)) =
                 |> toStr cod s1
             ) s2
 
-    "-\n" 
+    "- patient\n" 
     |> toStr cod ""
 
 
@@ -138,8 +138,8 @@ let initCategory = RootCategory |> createCategory []
 
 
 let findCatIn cs1 cs2 = 
-    printfn "find: %s" (cs2 |> List.map patientToStr |> String.concat ";")
-    printfn "in: %s" (cs1 |> List.map patientToStr |> String.concat ";")
+    //printfn "find: %s" (cs2 |> List.map patientToStr |> String.concat ";")
+    //printfn "in: %s" (cs1 |> List.map patientToStr |> String.concat ";")
     cs2 |> List.isTailList cs1
 
 
@@ -219,7 +219,7 @@ let addCategories cs =
         fun cod pc ->
             match cod with
             | Dose _ -> Category(pc, cod)
-            | Categories cs'-> pc |> createCategory (cs' @ cs)
+            | Categories _ -> pc |> createCategory cs
     applyMap f
 
 
@@ -231,8 +231,7 @@ let replaceCategory pc =
 let applyCollect f pcs c =
     let rec apply current pcs (Category(pc', cod)) =
         let current = current @ [pc']
-        if pcs |> findCatIn current then 
-            f (c |> findParent pcs) 
+        if pcs |> findCatIn current then f ()
         else [ (Category(pc', cod)) ]
         |> List.collect (fun (Category(pc', cod)) ->
             match cod with
@@ -326,7 +325,7 @@ let splitMinMax f b mm =
     ]
 
 
-let addMinMaxCategory fc mm pcs c =
+let addMinMaxCategory fc pcs mm c =
     mm
     |> evalMinMax
     |> List.map (fc >> (createCategory []))
@@ -351,77 +350,78 @@ let splitMinMaxCategory pcs f b c =
         mm
         |> splitMinMax f b
         |> List.map (fc >> (createCategory []))
-        |> fun xs -> 
-            let f _ = xs
+        |> fun cs -> 
+            let f _ = cs
             applyCollect f pcs c
     | _ -> c
 
 
-let removeCategory =
-    fun p ->
-        p
-        |> function
-        | None   -> "no parent"
-        | Some c ->
-            c
-            |> getCategoryChildren
-            |> function
-            | Dose _ -> "dose"
-            | Categories cs ->
-                cs
-                |> List.map (getCategoryPatient >> patientToStr)
-                |> String.concat ";"
-        |> printfn "removing from %s"
-        []
-    
-    |> applyCollect 
+let clearCategory pcs c =
+    if pcs |> List.isEmpty then c
+    else 
+        let pc = pcs |> List.last
+        match pc with
+        | RootCategory -> initCategory
+        | _ ->
+            let f _ =
+                match pc with
+                | RootCategory  -> [ ]
+                | Gender Male   -> [ Male |> Gender |> createCategory [] ]
+                | Gender Female -> [ Female |> Gender |> createCategory [] ]
+                | Age mm        -> [ mm |> Age |> createCategory [] ]
+                | GestationAge mm -> [ mm |> GestationAge |> createCategory [] ]
+                | PostConceptionalAge mm -> [ mm |> PostConceptionalAge |> createCategory [] ]
+                | Weight mm -> [ mm |> Weight |> createCategory [] ]
+                | BodySurfaceArea mm -> [ mm |> BodySurfaceArea |> createCategory [] ]    
+            applyCollect f pcs c
 
 
 // testing
 initCategory
 |> addGenderCategory [ RootCategory ]
-|> addAgeCategory (minMax |> setMinIncl 1.) [ Male |> Gender ]
+|> addAgeCategory  [ Male |> Gender ] (minMax |> setMinIncl 10.)
+|> addAgeCategory [ Male |> Gender ] (minMax |> setMinIncl 1.) 
 |> splitMinMaxCategory [ minMax |> setMinIncl 1. |> Age ] 12. false
-|> addGestAgeCategory  (minMax |> setMinIncl 32.) [minMax |> setMaxExcl 1. |> Age]
-|> splitMinMaxCategory [ minMax |> setMinIncl 32. |> GestationAge ] 36. false
-|> addWeightCategory (minMax |> setMaxIncl 10.) [ minMax |> setMinIncl 1. |> setMaxExcl 12. |> Age ]
-|> addWeightCategory (minMax |> setMaxIncl 10.)  [ Female |> Gender ] 
-|> splitMinMaxCategory [ Female |> Gender; minMax |> setMinExcl 10. |> Weight] 20. true
-|> fun x -> printfn "Start search"; x
+//|> addGestAgeCategory  (minMax |> setMinIncl 32.) [minMax |> setMaxExcl 1. |> Age]
+//|> splitMinMaxCategory [ minMax |> setMinIncl 32. |> GestationAge ] 36. false
+//|> addWeightCategory (minMax |> setMaxIncl 10.) [ minMax |> setMinIncl 1. |> setMaxExcl 12. |> Age ]
+//|> addWeightCategory (minMax |> setMaxIncl 10.)  [ Female |> Gender ] 
+//|> splitMinMaxCategory [ Female |> Gender; minMax |> setMinExcl 10. |> Weight] 20. true
+//|> fun x -> printfn "Start search"; x
 //|> findParent [ RootCategory; Male |> Gender; minMax |> setMaxExcl 1. |> Age; minMax |> setMinIncl 36. |> GestationAge ]
-|> removeCategory [ Female |> Gender ]
+//|> clearCategory [ Male |> Gender ]
 //|> addGenderCategory [ RootCategory ]
 |> toString
 |> printfn "%s"
 
 
 initCategory
-|> addAgeCategory (minMax |> setMinIncl 1. |> setMaxExcl 12.) [ RootCategory ]
+|> addAgeCategory [ RootCategory ] (minMax |> setMinIncl 1. |> setMaxExcl 12.) 
 |> addGenderCategory [ minMax |> setMinIncl 1. |> setMaxExcl 12. |> Age ]
 |> findParent [ Male |> Gender ]
 
 
 initCategory
-|> addAgeCategory (minMax |> setMaxExcl 1.) [ RootCategory ]
-|> addGestAgeCategory (minMax |> setMinIncl 28. |> setMaxIncl 37.) [ minMax |> setMaxExcl 1. |> Age] 
+|> addAgeCategory  [ RootCategory ] (minMax |> setMaxExcl 1.)
+|> addGestAgeCategory  [ minMax |> setMaxExcl 1. |> Age]  (minMax |> setMinIncl 28. |> setMaxIncl 37.)
 |> toString
 |> printfn "%s"
 
 
 initCategory
-|> addAgeCategory (minMax |> setMaxExcl (7. / 28.)) [ RootCategory ]
+|> addAgeCategory [ RootCategory ] (minMax |> setMaxExcl (7. / 28.))
 |> splitMinMaxCategory [ minMax |> setMinIncl (7./28.) |> Age ] 1. false
-|> addGestAgeCategory (minMax |> setMaxExcl 32.) [ minMax |> setMaxExcl (7. / 28.) |> Age ] 
+|> addGestAgeCategory [ minMax |> setMaxExcl (7. / 28.) |> Age ]  (minMax |> setMaxExcl 32.)
 |> splitMinMaxCategory [ minMax |> setMinIncl 32. |> GestationAge ] 37. true
-|> addGestAgeCategory (minMax |> setMaxExcl 37.) [ minMax |> setMinIncl (7. / 28.) |> setMaxExcl 1. |> Age ]
+|> addGestAgeCategory [ minMax |> setMinIncl (7. / 28.) |> setMaxExcl 1. |> Age ] (minMax |> setMaxExcl 37.)
 |> toString
 |> printfn "%s"
 
 
 initCategory
 |> addGenderCategory [ RootCategory ]
-|> addWeightCategory (minMax |> setMaxExcl 10.) [ Male |> Gender ]
-|> addWeightCategory (minMax |> setMaxExcl 10.) [ Female |> Gender ]
+|> addWeightCategory [ Male |> Gender ] (minMax |> setMaxExcl 10.)
+|> addWeightCategory [ Female |> Gender ] (minMax |> setMaxExcl 10.)
 |> splitMinMaxCategory [ minMax |> setMinIncl 10. |> Weight ] 20. true
 |> toString
 |> printfn "%s"

@@ -90,25 +90,26 @@ let patientToStr pc =
     | Age mm -> mm |> minMaxToStr Doses.printAge |> sprintf "leeftijd: %s"
 
 
-let toString (Category(_, cod)) =
-    let rec toStr cod s1 s2 =
+let toString indent (Category(_, cod)) =
+    let rec toStr cod indent s =
         match cod with
         | Dose d ->
             match d with
             | Some d -> d |> Doses.printDose
-            | None   -> "geen dosering"
-            |> sprintf "%s: %s" s2
+            | None   -> "geen dosering\n"
+            |> String.replace "*" ""
+            |> sprintf "%s: %s" s
             
         | Categories cs ->
             cs
-            |> List.map (fun x -> (s1 + "\t", x))
-            |> List.fold (fun acc (s1, (Category(c, cod))) ->
-                sprintf "%s%s- %s\n" acc s1 (c |> patientToStr)
-                |> toStr cod s1
-            ) s2
-
-    "- patient\n" 
-    |> toStr cod ""
+            |> List.map (fun x -> (indent + "\t", x))
+            |> List.fold (fun acc (indent, (Category(c, cod))) ->
+                sprintf "%s\n%s- %s" acc indent (c |> patientToStr)
+                |> toStr cod indent
+            ) s
+    indent
+    |> sprintf "%s- patient" 
+    |> toStr cod indent
 
 
 let createCategory cs pc = 
@@ -382,16 +383,16 @@ initCategory
 |> addAgeCategory  [ Male |> Gender ] (minMax |> setMinIncl 10.)
 |> addAgeCategory [ Male |> Gender ] (minMax |> setMinIncl 1.) 
 |> splitMinMaxCategory [ minMax |> setMinIncl 1. |> Age ] 12. false
-//|> addGestAgeCategory  (minMax |> setMinIncl 32.) [minMax |> setMaxExcl 1. |> Age]
-//|> splitMinMaxCategory [ minMax |> setMinIncl 32. |> GestationAge ] 36. false
-//|> addWeightCategory (minMax |> setMaxIncl 10.) [ minMax |> setMinIncl 1. |> setMaxExcl 12. |> Age ]
-//|> addWeightCategory (minMax |> setMaxIncl 10.)  [ Female |> Gender ] 
-//|> splitMinMaxCategory [ Female |> Gender; minMax |> setMinExcl 10. |> Weight] 20. true
+|> addGestAgeCategory [minMax |> setMaxExcl 1. |> Age]  (minMax |> setMinIncl 32.)
+|> splitMinMaxCategory [ minMax |> setMinIncl 32. |> GestationAge ] 36. false
+|> addWeightCategory  [ minMax |> setMinIncl 1. |> setMaxExcl 12. |> Age ] (minMax |> setMaxIncl 10.)
+|> addWeightCategory  [ Female |> Gender ] (minMax |> setMaxIncl 10.) 
+|> splitMinMaxCategory [ Female |> Gender; minMax |> setMinExcl 10. |> Weight] 20. true
 //|> fun x -> printfn "Start search"; x
 //|> findParent [ RootCategory; Male |> Gender; minMax |> setMaxExcl 1. |> Age; minMax |> setMinIncl 36. |> GestationAge ]
 //|> clearCategory [ Male |> Gender ]
-//|> addGenderCategory [ RootCategory ]
-|> toString
+// |> addGenderCategory [ RootCategory ]
+|> toString ""
 |> printfn "%s"
 
 
@@ -404,7 +405,7 @@ initCategory
 initCategory
 |> addAgeCategory  [ RootCategory ] (minMax |> setMaxExcl 1.)
 |> addGestAgeCategory  [ minMax |> setMaxExcl 1. |> Age]  (minMax |> setMinIncl 28. |> setMaxIncl 37.)
-|> toString
+|> toString ""
 |> printfn "%s"
 
 
@@ -414,7 +415,7 @@ initCategory
 |> addGestAgeCategory [ minMax |> setMaxExcl (7. / 28.) |> Age ]  (minMax |> setMaxExcl 32.)
 |> splitMinMaxCategory [ minMax |> setMinIncl 32. |> GestationAge ] 37. true
 |> addGestAgeCategory [ minMax |> setMinIncl (7. / 28.) |> setMaxExcl 1. |> Age ] (minMax |> setMaxExcl 37.)
-|> toString
+|> toString ""
 |> printfn "%s"
 
 
@@ -423,8 +424,163 @@ initCategory
 |> addWeightCategory [ Male |> Gender ] (minMax |> setMaxExcl 10.)
 |> addWeightCategory [ Female |> Gender ] (minMax |> setMaxExcl 10.)
 |> splitMinMaxCategory [ minMax |> setMinIncl 10. |> Weight ] 20. true
-|> toString
+|> toString ""
 |> printfn "%s"
 
 
 [RootCategory; Male |> Gender] |> findCatIn [RootCategory; Male |> Gender ]
+
+
+let mapDosesToCat (ds: Types.Dose list) =
+    let mapMinMax min max =
+        match min, max with
+        | None, None         -> minMax
+        | Some min, Some max -> minMax |> setMinIncl min |> setMaxExcl max
+        | Some min, None -> minMax |> setMinIncl min
+        | None, Some max -> minMax |> setMaxExcl max
+
+    let mapItem fMinMax fpc mapper (ds : Types.Dose list) : CategoriesOrDose =
+        ds
+        |> List.sortBy Doses.sortPat
+        |> List.forall (fMinMax >> (fun (min, max) -> min |> Option.isNone && max |> Option.isNone))
+        |> function 
+        | true -> 
+            ds
+            |> mapper
+        | false ->
+            ds
+            |> List.sortBy Doses.sortPat
+            |> List.groupBy fMinMax
+            |> List.map (fun ((min, max), ds) ->
+                mapMinMax min max
+                |> fpc
+                |> fun pc -> Category(pc, ds |> mapper) 
+            )
+            |> Categories
+
+    let mapWeight (ds : Types.Dose list) =
+        let fMinMax (d: Types.Dose) =
+            d.MinWeightKg,
+            d.MaxWeightKg
+        
+        let mapper (ds: Types.Dose list) =
+            match ds with
+            | [d] -> d |> Some |> Dose
+            | _   -> None |> Dose
+
+        ds
+        |> mapItem fMinMax Weight mapper
+
+    let mapGestAge (ds : Types.Dose list) =
+        let fMinMax (d: Types.Dose) =
+            d.MinGestAgeDays |> Option.map float, 
+            d.MaxGestAgeDays |> Option.map float
+        ds
+        |> mapItem fMinMax GestationAge mapWeight
+
+
+    let mapAge (ds : Types.Dose list) =
+        let fMinMax (d: Types.Dose) =
+            d.MinAgeMo,
+            d.MaxAgeMo
+        ds
+        |> mapItem fMinMax Age mapGestAge 
+
+    let mapPostAge (ds : Types.Dose list) =
+        let fMinMax (d: Types.Dose) =
+            d.MinPMAgeDays |> Option.map float, 
+            d.MaxPMAgeDays |> Option.map float
+        ds
+        |> mapItem fMinMax PostConceptionalAge mapAge
+    
+    ds
+    |> List.groupBy (fun d -> d.Gender)
+    |> function
+    | [g] -> 
+        Category(RootCategory, g |> snd |> mapPostAge)
+    | [g1; g2] ->
+        match g1 |> fst, g2 |> fst with
+        | Types.Male, Types.Female ->
+            [
+                Category(Male   |> Gender, g1 |> snd |> mapPostAge)
+                Category(Female |> Gender, g2 |> snd |> mapPostAge)
+            ]
+            |> Categories
+            |> fun cod -> Category(RootCategory, cod)
+        | Types.Female, Types.Male ->
+            [
+                Category(Female |> Gender, g1 |> snd |> mapPostAge)
+                Category(Male   |> Gender, g2 |> snd |> mapPostAge)
+            ]
+            |> Categories
+            |> fun cod -> Category(RootCategory, cod)
+
+        | _ -> Category(RootCategory, [] |> Categories)
+
+    | _ -> Category(RootCategory, [] |> Categories)
+
+
+let mapDoses (ds: Types.Dose list) =
+    ds
+    |> List.groupBy (fun d -> d.Generic)
+    |> List.map (fun (g, ds) ->
+        {|
+            Generic = g
+            Doses = 
+                ds
+                |> List.groupBy (fun d -> d.Shape)
+                |> List.map (fun (s, ds) ->
+                    {|
+                        Shape = s
+                        Doses = 
+                            ds
+                            |> List.groupBy (fun d -> d.Route)
+                            |> List.map (fun (r, ds) ->
+                                {|
+                                    Route = r
+                                    Doses = 
+                                        ds
+                                        |> List.groupBy (fun d -> d.Indication)
+                                        |> List.map (fun (i, ds) ->
+                                            {|
+                                                Indication = i
+                                                Patient = 
+                                                    ds
+                                                    |> mapDosesToCat
+                                            |}
+                                        )
+                                |}
+                            )
+                    |}
+                )
+        |}
+    )
+
+
+
+(Environment.environmentVars ()).TryGetValue "CONN_STR_AP"
+|> function 
+| true, s ->
+    printfn "=== Start ==="
+    Doses.getDoses s
+    |> List.filter (fun d -> d.Generic = "paracetamol") //&& d.Route = "iv")
+    |> mapDoses
+    |> List.iter (fun d ->
+        printfn "%s" d.Generic 
+        d.Doses
+        |> List.iter (fun d ->
+            printfn "\t%s" d.Shape 
+            d.Doses
+            |> List.iter (fun d ->
+                printfn "\t\t%s" d.Route
+                d.Doses
+                |> List.iter (fun d ->
+                    printfn "\t\t\t%s" d.Indication
+                    let p = d.Patient |> toString "\t\t\t"
+                    printfn "%s" p
+                )
+            )
+        )
+    )
+| _ -> failwith "cannot access database"
+

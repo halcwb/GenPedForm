@@ -101,23 +101,28 @@ initCategory
 
 
 let getPatientDoses (c: Category) = 
-    let add x xs =
-        if xs |> List.length = 0 then [ [ x ] ]
+    let add (sd, pc) xs =
+        if xs |> List.length = 0 then [ sd, [ pc ] ]
         else
             xs
-            |> List.map (fun xs' -> xs' @ [ x])
+            |> List.map (fun xs' -> sd, (xs' |> snd) @ [ pc ])
 
-    let rec get (acc : PatientCategory list list) (Category(pc, doc)) =
+    let rec get acc (Category(pc, doc)) =
         doc
         |> function
         | Categories cs when cs |> List.length > 0 ->
             cs
-            |> List.collect (get (acc |> add pc))
+            |> List.collect (get (acc |> add (None, pc)))
 
         | _ -> 
-            acc
-            |> add pc
-                
+            match doc with
+            | (Dose sd) ->
+                acc
+                |> add (sd, pc)
+            | _ ->
+                acc
+                |> add (None, pc)
+
     c
     |> get []
 
@@ -130,6 +135,16 @@ initCategory
 
 
 let mapCategorizedGeneric (g: CategorizedGeneric) =
+    let getMin = Option.bind (getMinValue >> Some)
+    let getMax = Option.bind (getMaxValue >> Some)
+
+    let get pcs f = 
+        pcs
+        |> List.fold (fun acc pc ->
+            if acc |> Option.isSome then acc
+            else pc |> f
+        ) None 
+
     g.Shapes
     |> List.collect(fun s ->
         s.Routes
@@ -138,6 +153,109 @@ let mapCategorizedGeneric (g: CategorizedGeneric) =
             |> List.collect (fun i ->
                 i.Patient
                 |> getPatientDoses 
+                |> List.map (fun (sd, pcs) ->
+                    {
+                        Doses.dose with
+                            Generic = g.Generic
+                            Shape = s.Shape
+                            Route = r.Route
+                            Indication = i.Indication
+                            Gender = 
+                                pcs
+                                |> List.fold (fun acc pc ->
+                                    if acc = (Types.Unknown "") then
+                                        match pc with
+                                        | Gender(Male) -> Types.Male
+                                        | Gender(Female) -> Types.Male
+                                        | _ -> acc
+                                    else acc
+                                ) (Types.Unknown "")
+                            MinAgeMo = 
+                                fun pc ->
+                                    match pc with
+                                    | Age mm -> mm.Min |> getMin
+                                    | _ -> None
+                                |> get pcs
+                            MaxAgeMo = 
+                                fun pc ->
+                                    match pc with
+                                    | Age mm -> mm.Max |> getMax
+                                    | _ -> None
+                                |> get pcs
+                            MinGestAgeDays = 
+                                fun pc ->
+                                    match pc with
+                                    | GestationAge mm -> mm.Min |> getMin |> Option.map int
+                                    | _ -> None
+                                |> get pcs
+                            MaxGestAgeDays = 
+                                fun pc ->
+                                    match pc with
+                                    | GestationAge mm -> mm.Max |> getMax |> Option.map int
+                                    | _ -> None
+                                |> get pcs
+                            MinPMAgeDays = 
+                                fun pc ->
+                                    match pc with
+                                    | PostConceptionalAge mm -> mm.Min |> getMin |> Option.map int
+                                    | _ -> None
+                                |> get pcs
+                            MaxPMAgeDays = 
+                                fun pc ->
+                                    match pc with
+                                    | PostConceptionalAge mm -> mm.Max |> getMax |> Option.map int
+                                    | _ -> None
+                                |> get pcs
+                            MinWeightKg = 
+                                fun pc ->
+                                    match pc with
+                                    | Weight mm -> mm.Min |> getMin 
+                                    | _ -> None
+                                |> get pcs
+                            MaxWeightKg = 
+                                fun pc ->
+                                    match pc with
+                                    | Weight mm -> mm.Max |> getMax
+                                    | _ -> None
+                                |> get pcs
+                            Freqs = 
+                                match sd with
+                                | Some d -> d.Freqs
+                                | None   -> []
+                            Unit = 
+                                match sd with
+                                | Some d -> d.Unit
+                                | None   -> ""
+                            NormDose =
+                                match sd with
+                                | Some d -> d.NormDose
+                                | None   -> None
+                            MinDose =
+                                match sd with
+                                | Some d -> d.MinDose
+                                | None   -> None
+                            MaxDose =
+                                match sd with
+                                | Some d -> d.MaxDose
+                                | None   -> None
+                            AbsMaxDose =
+                                match sd with
+                                | Some d -> d.AbsMaxDose
+                                | None   -> None
+                            MaxPerDose =
+                                match sd with
+                                | Some d -> d.MaxPerDose
+                                | None   -> None
+                            StartDose =
+                                match sd with
+                                | Some d -> d.StartDose
+                                | None   -> None
+                            Products =
+                                match sd with
+                                | Some d -> d.Products
+                                | None   -> []
+                    }
+                )
             )
         )
     )

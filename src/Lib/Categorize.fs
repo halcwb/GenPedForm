@@ -21,6 +21,7 @@ type PostConceptionalAgeCategory = MinMax
 type WeightCategory = MinMax 
 type BodySurfaceAreaCategory = MinMax
 
+
 type PatientCategory =
     | RootCategory
     | Gender of GenderCategory 
@@ -35,6 +36,14 @@ type PatientCategory =
 type Category =
     | Category of PatientCategory * CategoriesOrDose
 and CategoriesOrDose = Categories of Category list | Dose of Types.Dose option
+
+
+let getMinValue = function
+    | MinIncl v | MinExcl v -> v
+
+
+let getMaxValue = function
+    | MaxIncl v | MaxExcl v -> v
 
 
 let applyMinMaxPatientCategory f = function

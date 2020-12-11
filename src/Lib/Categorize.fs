@@ -1,337 +1,573 @@
 ﻿module Categorize
 
-type MinMax =
-    {
-        Min : Minimum option
-        Max : Maximum option
-    }
-and Minimum = | MinIncl of float | MinExcl of float
-and Maximum = | MaxIncl of float | MaxExcl of float
+open System
+open System.Collections.Generic
+open Utils
 
 
-let minmax = { Min = None; Max = None }
+type Minimum = | MinIncl of float | MinExcl of float
+type Maximum = | MaxIncl of float | MaxExcl of float
 
 
-let checkMinMax mm =
+type MinMax = { Min : Minimum option; Max : Maximum option}
+
+
+type GenderCategory =
+     | Male 
+     | Female 
+type AgeCategory = MinMax 
+type GestationalAgeCategory = MinMax 
+type PostConceptionalAgeCategory = MinMax 
+type WeightCategory = MinMax 
+type BodySurfaceAreaCategory = MinMax
+
+type PatientCategory =
+    | RootCategory
+    | Gender of GenderCategory 
+    | Age of AgeCategory
+    | GestationAge of GestationalAgeCategory
+    | PostConceptionalAge of PostConceptionalAgeCategory
+    | Weight of WeightCategory
+    | BodySurfaceArea of BodySurfaceAreaCategory
+
+
+
+type Category =
+    | Category of PatientCategory * CategoriesOrDose
+and CategoriesOrDose = Categories of Category list | Dose of Types.Dose option
+
+
+let applyMinMaxPatientCategory f = function
+    | RootCategory -> RootCategory
+    | Gender g -> g |> Gender
+    | Age mm -> mm |> f |> Age 
+    | GestationAge mm -> mm |> f |> GestationAge
+    | PostConceptionalAge mm -> mm |> f |> PostConceptionalAge
+    | Weight mm  -> mm |> Weight
+    | BodySurfaceArea mm -> mm |> BodySurfaceArea
+
+
+let minToStr f = function
+    | MinIncl v -> v |> f |> sprintf "van (incl) %s" 
+    | MinExcl v -> v |> f |> sprintf "van (excl) %s" 
+
+
+
+let maxToStr f = function
+    | MaxIncl v -> v |> f |> sprintf "tot (incl) %s"
+    | MaxExcl v -> v |> f |> sprintf "tot (excl) %s"
+
+
+let minMaxToStr f mm =
+    let minToStr = minToStr f
+    let maxToStr = maxToStr f
     match mm.Min, mm.Max with
-    | None, None 
-    | Some _, None
-    | None, Some _ -> true
-    | Some min, Some max ->
-        match min, max with
-        | MinExcl v1, MaxIncl v2 
-        | MinIncl v1, MaxExcl v2
-        | MinExcl v1, MaxExcl v2 -> v1 < v2
-        | MinIncl v1, MaxIncl v2 -> v1 <= v2
+    | Some min, Some max -> sprintf "%s %s" (min |> minToStr) (max |> maxToStr)
+    | Some min, None -> min |> minToStr
+    | None, Some max -> max |> maxToStr
+    | None, None -> ""
 
 
-let setMin b v mm =
-    {
-        mm with
-            Min = 
-                if b then v |> MinIncl else v |> MinExcl
-                |> Some
-    }
-    |> fun x -> if x |> checkMinMax then x else mm
+let genderToStr = function
+    | Male -> "man"
+    | Female -> "vrouw"
 
 
-let setMax b v mm =
-    {
-        mm with
-            Max = 
-                if b then v |> MaxIncl else v |> MaxExcl
-                |> Some
-    }
-    |> fun x -> if x |> checkMinMax then x else mm
+let patientToStr pc = 
+    let toStr v =
+        if (v |> int |> float) = v then v |> int |> sprintf "%i"
+        else v |> sprintf "%A"
+
+    match pc with
+    | RootCategory -> ""
+    | Gender g -> g |> genderToStr
+    | GestationAge mm -> mm |> minMaxToStr (int >> Doses.printDays) |> sprintf "zwangerschapsduur: %s weken"
+    | PostConceptionalAge mm -> mm |> minMaxToStr (int >> Doses.printDays) |> sprintf "post Conceptie Leeftijd: %s"
+    | Weight mm -> mm |> minMaxToStr toStr |> sprintf "gewicht: %s kg"
+    | BodySurfaceArea mm -> mm |> minMaxToStr toStr |> sprintf "lichaamsoppervlak: %s m2"
+    | Age mm -> mm |> minMaxToStr Doses.printAge |> sprintf "leeftijd: %s"
 
 
-let setMaxMin min =
-        match min with
-        | MinIncl v -> MaxExcl v
-        | MinExcl v -> MaxIncl v
-        |> Some
-        
+let toString indent (Category(_, cod)) =
+    let rec toStr cod indent s =
+        match cod with
+        | Dose d ->
+            match d with
+            | Some d -> d |> Doses.printDose
+            | None   -> "geen dosering\n"
+            |> String.replace "*" ""
+            |> sprintf "%s: %s" s
+            
+        | Categories cs ->
+            cs
+            |> List.map (fun x -> (indent + "\t", x))
+            |> List.fold (fun acc (indent, (Category(c, cod))) ->
+                sprintf "%s\n%s- %s" acc indent (c |> patientToStr)
+                |> toStr cod indent
+            ) s
+    indent
+    |> sprintf "%s- patient" 
+    |> toStr cod indent
 
-let setMinMax max =
+
+let createCategory cs pc = 
+    let eqs (Category(c1, _)) (Category(c2, _)) = 
+        match c1, c2 with
+        | Gender _, Gender _ 
+        | Age _, Age _ 
+        | PostConceptionalAge _, PostConceptionalAge _ 
+        | Weight _, Weight _
+        | GestationAge _, GestationAge _ -> true
+        | _ -> false
+
+    match cs with
+    | [] -> []
+    | h::_ ->
+        cs 
+        |> List.filter (eqs h) 
+        |> List.distinctBy (fun (Category(pc, _)) -> pc)
+    |> fun cs ->
+        (pc, cs |> Categories) |> Category 
+
+
+let createCategoryDose d pc = (Category(pc, d |> Dose))
+
+
+let initCategory = RootCategory |> createCategory []
+
+
+let findCatIn cs1 cs2 = 
+    //printfn "find: %s" (cs2 |> List.map patientToStr |> String.concat ";")
+    //printfn "in: %s" (cs1 |> List.map patientToStr |> String.concat ";")
+    cs2 |> List.isTailList cs1
+
+
+let applyFold f pcs cat =
+    let rec apply current pcs (Category(pc, cod)) =
+        let current = current @ [pc]
+        match cod with
+        | Dose _ -> None
+        | Categories cs ->
+            if pcs |> findCatIn current then pc |> f cs
+            else 
+                cs
+                |> List.fold(fun acc c ->
+                    if acc |> Option.isSome then acc
+                    else apply current pcs c
+                ) None
+
+    apply [] pcs cat
+
+
+let findCategory = applyFold (fun cs pc -> pc |> createCategory cs |> Some)
+
+
+let getCategoriesOrDose (Category(_, cod)) = cod
+let getCategoryPatient (Category(c, _)) = c
+
+
+let findParent pcs c =
+    let rec find current pcs (Category(parent, cod)) c =
+        let current = current @ [ (c |> getCategoryPatient) ]
+        if pcs |> findCatIn current then 
+            Category(parent, cod) |> Some
+        else
+            c
+            |> getCategoriesOrDose
+            |> function
+            | Dose _        -> None
+            | Categories cs ->
+                cs
+                |> List.fold(fun acc c' ->
+                    if acc |> Option.isSome then acc
+                    else find current pcs c c'
+                ) None
+
+    c
+    |> getCategoriesOrDose
+    |> function
+    | Dose _ -> None
+    | Categories cs ->
+        cs
+        |> List.fold (fun acc child ->
+            if acc |> Option.isSome then acc
+            else find [ RootCategory ] pcs c child
+        ) None
+    
+
+let applyMap f pcs c =
+    let rec apply current pcs (Category(pc, cod)) =
+        let current = current @ [pc]
+
+        if pcs |> findCatIn current then pc |> f cod else (Category(pc, cod))
+        |> fun (Category(pc, cod)) ->
+            match cod with
+            | Dose _ -> (Category(pc, cod))
+            | Categories cs ->                
+                if cs |> List.isEmpty then pc |> createCategory cs
+                else 
+                    cs
+                    |> List.map (apply current pcs)
+                    |> fun cs -> pc |> createCategory cs
+
+    apply [] pcs c
+
+
+let addCategories cs =
+    let f =
+        fun cod pc ->
+            match cod with
+            | Dose _ -> Category(pc, cod)
+            | Categories _ -> pc |> createCategory cs
+    applyMap f
+
+
+let replaceCategory pc =
+    fun cod _ -> Category(pc, cod)
+    |> applyMap
+
+
+let applyCollect f pcs c =
+    let rec apply current pcs (Category(pc', cod)) =
+        let current = current @ [pc']
+        if pcs |> findCatIn current then f ()
+        else [ (Category(pc', cod)) ]
+        |> List.collect (fun (Category(pc', cod)) ->
+            match cod with
+            | Dose _ -> [ Category(pc', cod) ]
+            | Categories cs ->
+                if cs |> List.isEmpty then pc' |> createCategory cs
+                else 
+                    cs
+                    |> List.collect (apply current pcs)
+                    |> fun xs -> pc' |> createCategory xs
+                |> List.singleton
+        )
+
+    match c |> getCategoriesOrDose with
+    | Dose _ -> c
+    | Categories cs ->
+        cs
+        |> List.collect (apply [] pcs)
+        |> fun cs -> 
+            c
+            |> getCategoryPatient
+            |> createCategory cs
+
+
+let addGenderCategory pc c =
+    [ 
+        Male   |> Gender
+        Female |> Gender  
+    ] 
+    |> List.map (createCategory [])
+    |> fun cs -> c |> addCategories cs pc
+
+
+let minMax = { Min = None ; Max = None }
+
+let createMin b f = if b then f |> MinIncl else f |> MinExcl
+let createMax b f = if b then f |> MaxIncl else f |> MaxExcl
+
+let setMin min mm = { mm with Min = Some min }
+let setMax max mm = { mm with Max = Some max }
+
+
+let inline setMinMaxValue c s b f mm = 
+    f 
+    |> c b
+    |> fun x -> mm |> s x
+
+let setMinIncl = setMinMaxValue createMin setMin true 
+let setMinExcl = setMinMaxValue createMin setMin false 
+let setMaxIncl = setMinMaxValue createMax setMax true 
+let setMaxExcl = setMinMaxValue createMax setMax false 
+
+
+let minToMax min =
+    match min with
+    | MinIncl v -> MaxExcl v
+    | MinExcl v -> MaxIncl v
+
+
+let maxToMin max =
     match max with
     | MaxIncl v -> MinExcl v
     | MaxExcl v -> MinIncl v
-    |> Some
 
 
-let evalMinMax mm =
+let evalMinMaxCont fOld fNew mm =
     match mm.Min, mm.Max with
-    | None, None -> [ mm ]
+    | None, None     -> [ mm |> fOld ]
     | Some min, None ->
         [
-            { minmax with Max = setMaxMin min }
-            mm
+            { minMax with Max = minToMax min |> Some } |> fNew
+            mm |> fOld
         ]
     | None, Some max ->
         [
-            mm
-            { minmax with Min = setMinMax max}
+            mm |> fOld
+            { minMax with Min = maxToMin max |> Some } |> fNew
         ]
     | Some min, Some max ->
         [
-            { minmax with Max = setMaxMin min }
-            mm
-            { minmax with Min = setMinMax max}
+            { minMax with Max = minToMax min |> Some } |> fNew
+            mm |> fOld
+            { minMax with Min = maxToMin max |> Some } |> fNew
         ]
 
 
-
-type AgeCategory = MinMax
-
-
-type WeightCategory = MinMax
+let evalMinMax = evalMinMaxCont id id
 
 
-type GestationalAge = MinMax
+let splitMinMax f b mm =
+    [
+        if b then mm |> setMaxIncl f else mm |> setMaxExcl f
+        if b then mm |> setMinExcl f else mm |> setMinIncl f
+    ]
 
 
-type PostConceptionalAge = MinMax
-
-
-type PatientCategory =
-    {
-        Gender : GenderCategory option
-        Age : AgeCategory
-        Weight : WeightCategory
-        GestAge : GestationalAge
-        PostAge : PostConceptionalAge
-    }
-and GenderCategory = Male | Female
-
-
-let categorize get set pat =
-    pat
-    |> get
+let addMinMaxCategory fc pcs mm c =
+    mm
     |> evalMinMax
-    |> List.map (fun mm ->
-        pat |> set mm
+    |> List.map (fc >> (createCategory []))
+    |> fun cs -> c |> addCategories cs pcs
+
+
+let addAgeCategory = addMinMaxCategory Age
+let addGestAgeCategory = addMinMaxCategory GestationAge
+let addPostAgeCategory = addMinMaxCategory PostConceptionalAge
+let addWeightCategory = addMinMaxCategory Weight
+let addBSACategory = addMinMaxCategory BodySurfaceArea
+
+let splitMinMaxCategory pcs f b c =
+    match pcs |> List.last with
+    | Age mm -> (Some mm, Some Age)
+    | GestationAge mm -> (Some mm, Some GestationAge)
+    | PostConceptionalAge mm -> (Some mm, Some PostConceptionalAge)
+    | Weight mm -> (Some mm, Some Weight)
+    | _ -> None, None
+    |> function
+    | Some mm, Some fc ->
+        mm
+        |> splitMinMax f b
+        |> List.map (fc >> (createCategory []))
+        |> fun cs -> 
+            let f _ = cs
+            applyCollect f pcs c
+    | _ -> c
+
+
+let clearCategory pcs c =
+    if pcs |> List.isEmpty then c
+    else 
+        let pc = pcs |> List.last
+        match pc with
+        | RootCategory -> initCategory
+        | _ ->
+            let f _ =
+                match pc with
+                | RootCategory  -> [ ]
+                | Gender Male   -> [ Male |> Gender |> createCategory [] ]
+                | Gender Female -> [ Female |> Gender |> createCategory [] ]
+                | Age mm        -> [ mm |> Age |> createCategory [] ]
+                | GestationAge mm -> [ mm |> GestationAge |> createCategory [] ]
+                | PostConceptionalAge mm -> [ mm |> PostConceptionalAge |> createCategory [] ]
+                | Weight mm -> [ mm |> Weight |> createCategory [] ]
+                | BodySurfaceArea mm -> [ mm |> BodySurfaceArea |> createCategory [] ]    
+            applyCollect f pcs c
+
+
+let evalTwoMinMax (mm1 : MinMax) (mm2 : MinMax) =
+    match mm1.Max, mm2.Min with
+    | Some (MaxExcl v1), Some (MinIncl v2) when v1 < v2 ->
+            minMax
+            |> setMinIncl v1
+            |> setMaxExcl v2
+            |> Some
+    | _ -> None
+
+
+let evalCategories (cs : Category list) =
+    cs
+    |> function 
+    | [ c ] -> 
+        match c |> getCategoryPatient with
+        | Age mm -> mm |> evalMinMaxCont (fun _ -> c) (Age >> (createCategory []))
+        | GestationAge mm -> mm |> evalMinMaxCont (fun _ -> c) (GestationAge >> (createCategory []))
+        | PostConceptionalAge mm -> mm |> evalMinMaxCont (fun _ -> c) (PostConceptionalAge >> (createCategory []))
+        | Weight mm -> mm |> evalMinMaxCont (fun _ -> c) (Weight >> (createCategory []))
+        | BodySurfaceArea mm -> mm |> evalMinMaxCont (fun _ -> c) (BodySurfaceArea >> (createCategory []))
+        | _ -> cs
+
+    | _ -> cs
+
+    |> List.fold (fun acc c ->
+        match acc |> List.rev with
+        | [] -> [ c ]
+        | h::_ ->
+            let pc1 = h |> getCategoryPatient
+            let pc2 = c |> getCategoryPatient
+            match pc1, pc2 with
+            | Age mm1, Age mm2 -> evalTwoMinMax mm1 mm2 |> Option.map Age
+            | GestationAge mm1, GestationAge mm2 -> evalTwoMinMax mm1 mm2 |> Option.map GestationAge
+            | PostConceptionalAge mm1, PostConceptionalAge mm2 -> evalTwoMinMax mm1 mm2 |> Option.map PostConceptionalAge
+            | Weight mm1, Weight mm2 -> evalTwoMinMax mm1 mm2 |> Option.map Weight
+            | BodySurfaceArea mm1, BodySurfaceArea mm2 -> evalTwoMinMax mm1 mm2 |> Option.map BodySurfaceArea
+            | _ -> None
+            |> function
+            | None    -> [ c ] |> List.append acc
+            | Some pc -> [ Category(pc, [] |> Categories); c ] |> List.append acc
+    ) []
+    
+
+let mapDosesToCat (ds: Types.Dose list) =
+    let mapMinMax min max =
+        match min, max with
+        | None, None         -> minMax
+        | Some min, Some max -> minMax |> setMinIncl min |> setMaxExcl max
+        | Some min, None -> minMax |> setMinIncl min
+        | None, Some max -> minMax |> setMaxExcl max
+
+    let mapDoses fMinMax fpc mapper (ds : Types.Dose list) : CategoriesOrDose =
+        ds
+        |> List.sortBy Doses.sortPat
+        |> List.forall (fMinMax >> (fun (min, max) -> min |> Option.isNone && max |> Option.isNone))
+        |> function 
+        | true -> 
+            ds
+            |> mapper
+        | false ->
+            ds
+            |> List.sortBy Doses.sortPat
+            |> List.groupBy fMinMax
+            |> List.map (fun ((min, max), ds) ->
+                mapMinMax min max
+                |> fpc
+                |> fun pc -> Category(pc, ds |> mapper) 
+            )
+            |> evalCategories
+            |> Categories
+
+    let mapWeight (ds : Types.Dose list) =
+        let fMinMax (d: Types.Dose) =
+            d.MinWeightKg,
+            d.MaxWeightKg
+        
+        let mapper (ds: Types.Dose list) =
+            match ds with
+            | [d] -> d |> Some |> Dose
+            | _   -> None |> Dose
+
+        ds
+        |> mapDoses fMinMax Weight mapper
+
+    let mapGestAge (ds : Types.Dose list) =
+        let fMinMax (d: Types.Dose) =
+            d.MinGestAgeDays |> Option.map float, 
+            d.MaxGestAgeDays |> Option.map float
+        ds
+        |> mapDoses fMinMax GestationAge mapWeight
+
+
+    let mapAge (ds : Types.Dose list) =
+        let fMinMax (d: Types.Dose) =
+            d.MinAgeMo,
+            d.MaxAgeMo
+        ds
+        |> mapDoses fMinMax Age mapGestAge 
+
+    let mapPostAge (ds : Types.Dose list) =
+        let fMinMax (d: Types.Dose) =
+            d.MinPMAgeDays |> Option.map float, 
+            d.MaxPMAgeDays |> Option.map float
+        ds
+        |> mapDoses fMinMax PostConceptionalAge mapAge
+    
+    ds
+    |> List.groupBy (fun d -> d.Gender)
+    |> function
+    | [g] -> 
+        Category(RootCategory, g |> snd |> mapPostAge)
+    | [g1; g2] ->
+        match g1 |> fst, g2 |> fst with
+        | Types.Male, Types.Female ->
+            [
+                Category(Male   |> Gender, g1 |> snd |> mapPostAge)
+                Category(Female |> Gender, g2 |> snd |> mapPostAge)
+            ]
+            |> Categories
+            |> fun cod -> Category(RootCategory, cod)
+        | Types.Female, Types.Male ->
+            [
+                Category(Female |> Gender, g1 |> snd |> mapPostAge)
+                Category(Male   |> Gender, g2 |> snd |> mapPostAge)
+            ]
+            |> Categories
+            |> fun cod -> Category(RootCategory, cod)
+
+        | _ -> Category(RootCategory, [] |> Categories)
+
+    | _ -> Category(RootCategory, [] |> Categories)
+
+
+
+type CategorizedGeneric =
+    {
+        Generic : string
+        Shapes : CategorizedShape list
+    }
+and CategorizedShape = 
+    {
+        Shape : string
+        Routes : CategorizedRoute list
+    }
+and CategorizedRoute = 
+    {
+        Route : string
+        Indications : CategorizedIndication list
+    }
+and CategorizedIndication = 
+    {
+        Indication : string
+        Patient : Category
+
+    }
+
+
+let mapDoses (ds: Types.Dose list) =
+    ds
+    |> List.groupBy (fun d -> d.Generic)
+    |> List.map (fun (g, ds) ->
+        {
+            Generic = g
+            Shapes = 
+                ds
+                |> List.groupBy (fun d -> d.Shape)
+                |> List.map (fun (s, ds) ->
+                    {
+                        Shape = s
+                        Routes = 
+                            ds
+                            |> List.groupBy (fun d -> d.Route)
+                            |> List.map (fun (r, ds) ->
+                                {
+                                    Route = r
+                                    Indications = 
+                                        ds
+                                        |> List.groupBy (fun d -> d.Indication)
+                                        |> List.map (fun (i, ds) ->
+                                            {
+                                                Indication = i
+                                                Patient = 
+                                                    ds
+                                                    |> mapDosesToCat
+                                            }
+                                        )
+                                }
+                            )
+                    }
+                )
+        }
     )
-
-
-let categorizeAge pat =
-    let get pat = pat.Age
-    let set mm pat = { pat with Age = mm}
-    pat
-    |> categorize get set
-
-
-let categorizeGestAge pat =
-    let get pat = pat.GestAge
-    let set mm pat = { pat with GestAge = mm}
-    pat
-    |> categorize get set
-
-
-let categorizePostAge pat =
-    let get pat = pat.PostAge
-    let set mm pat = { pat with PostAge = mm}
-    pat
-    |> categorize get set
-
-
-let categorizeWeight pat =
-    let get pat = pat.Weight
-    let set mm pat = { pat with Weight = mm}
-    pat
-    |> categorize get set
-
-
-let categorizeGender pat =
-    match pat.Gender with
-    | Some(Male) -> 
-        [
-            { pat with Gender = Female |> Some }
-            pat
-        ]
-    | Some(Female) ->
-        [
-            { pat with Gender = Male |> Some }
-            pat
-        ]
-    | None -> [ pat ]
-
-
-let setAgeMin min b pc =
-    {
-        pc with
-            Age = pc.Age |> setMin min b
-    }
-    |> categorizeAge
-
-
-let setAgeMax max b pc =
-    {
-        pc with
-            Age = pc.Age |> setMax max b
-    }
-    |> categorizeAge
-
-
-let setGestAgeMin min b pc =
-    {
-        pc with
-            GestAge = pc.GestAge |> setMin min b
-    }
-    |> categorizeGestAge
-
-
-let setGestAgeMax max b pc =
-    {
-        pc with
-            GestAge = pc.GestAge |> setMax max b
-    }
-    |> categorizeGestAge
-
-
-let setPostAgeMin min b pc =
-    {
-        pc with
-            PostAge = pc.PostAge |> setMin min b
-    }
-    |> categorizePostAge
-
-
-let setPostAgeMax max b pc =
-    {
-        pc with
-            PostAge = pc.PostAge |> setMax max b
-    }
-    |> categorizePostAge
-
-
-let setWeightMin min b pc =
-    {
-        pc with
-            Weight = pc.Weight |> setMin min b
-    }
-    |> categorizeWeight
-
-
-let setWeightMax max b pc =
-    {
-        pc with
-            Weight = pc.Weight |> setMax max b
-    }
-    |> categorizeWeight
-
-
-let setGender g pc =
-    {
-        pc with
-            Gender = g
-    }
-    |> categorizeGender
-
-let setPatients set n b a pats =
-    match pats |> List.tryItem n with
-    | Some pat ->
-        pats
-        |> List.collect (fun x ->
-            if x <> pat then [ x ]
-            else
-                pat |> set b a
-        )
-    | None -> pats
-    |> List.distinct
-
-
-let setPatientsGender n g = setPatients (fun _ _ pc -> pc |> setGender g) n false 0.
-
-
-let setPatientsAgeMin = setPatients setAgeMin
-
-
-let setPatientsAgeMax = setPatients setAgeMax
-
-
-let setPatientsGestAgeMin = setPatients setGestAgeMin
-
-
-let setPatientsGestAgeMax = setPatients setGestAgeMax
-
-
-let setPatientsPostAgeMin = setPatients setPostAgeMin
-
-
-let setPatientsPostAgeMax = setPatients setPostAgeMax
-
-
-let setPatientsWeightMin = setPatients setWeightMin
-
-
-let setPatientsWeightMax = setPatients setWeightMax
-
-
-type PatientCategories = PatientCategory list
-
-
-type Categorize = PatientCategory -> PatientCategories
-
-
-open Utils
-open Types
-
-let patient =
-    {
-        Gender = None
-        Age = minmax
-        Weight = minmax
-        GestAge = minmax
-        PostAge = minmax
-    }
-
-
-let mapDose get set incr (d : Dose) (n, pats) =
-    match d |> get with
-    | Some x -> (if incr then n + 1 else n), pats |> set n true x
-    | None   -> n, pats
-
-
-let mapGender (d: Dose) (n, pats) =
-    match d.Gender with
-    | Male -> n + 1, pats  |> setPatientsGender n (Some GenderCategory.Male)
-    | Female -> n + 1, pats  |> setPatientsGender n (Some GenderCategory.Female)
-    | Unknown _ -> n, pats
-
-
-let mapDoseAgeMin = mapDose (fun d -> d.MinAgeMo) setPatientsAgeMin true
-let mapDoseAgeMax = mapDose (fun d -> d.MaxAgeMo) setPatientsAgeMax false
-
-let mapDoseWeightMin = mapDose (fun d -> d.MinWeightKg) setPatientsWeightMin true
-let mapDoseWeightMax = mapDose (fun d -> d.MaxWeightKg) setPatientsWeightMax false
-
-
-let mapDoseGestAgeMin = mapDose (fun d -> d.MinGestAgeDays |> Option.map float) setPatientsGestAgeMin true
-let mapDoseGestAgeMax = mapDose (fun d -> d.MaxGestAgeDays |> Option.map float) setPatientsGestAgeMax false
-
-
-let mapDosePostAgeMin = mapDose (fun d -> d.MinPMAgeDays |> Option.map float) setPatientsPostAgeMin true
-let mapDosePostAgeMax = mapDose (fun d -> d.MaxPMAgeDays |> Option.map float) setPatientsPostAgeMax false
-    
-    
-let print (pc : PatientCategory) =
-    let minMaxToMinFloatOption mm =
-        mm.Min |> Option.bind (fun min -> match min with | MinIncl v | MinExcl v -> v |> Some)
-    let minMaxToMaxFloatOption mm =
-        mm.Max |> Option.bind (fun max -> match max with | MaxIncl v | MaxExcl v -> v |> Some)
-    let minMaxToMinIntOption mm =
-        mm.Min |> Option.bind (fun min -> match min with | MinIncl v | MinExcl v -> v |> int |> Some)
-    let minMaxToMaxIntOption mm =
-        mm.Max |> Option.bind (fun max -> match max with | MaxIncl v | MaxExcl v -> v |> int |> Some)
-
-    Doses.printPatCat
-        (Unknown "")
-        (pc.Age |> minMaxToMinFloatOption)
-        (pc.Age |> minMaxToMaxFloatOption)        
-        (pc.GestAge |> minMaxToMinIntOption)
-        (pc.GestAge |> minMaxToMaxIntOption)
-        (pc.PostAge |> minMaxToMinIntOption)
-        (pc.PostAge |> minMaxToMaxIntOption)
-        (pc.Weight |> minMaxToMinFloatOption)
-        (pc.Weight |> minMaxToMaxFloatOption)        
 

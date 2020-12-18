@@ -1,9 +1,0 @@
-Informedica.GenUtils.Lib
-FSharp.Core
-
-group Server
-    Saturn
-    Thoth.Json.Giraffe
-    Fable.Remoting.Giraffe
-    Serilog.AspNetCore
-	Serilog.Sinks.Console

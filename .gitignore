@@ -69,20 +69,21 @@ publishnuget.cmd
 # Add source files
 !/scripts/
 !/src/
-!/src/Shared/
-!/src/Server/
-!/src/Server/resources/
-!/src/Server/resources/*.csv
-!/src/Server/Scripts/
-!/src/Server/Scripts/resources/
-!/src/Server/Scripts/resources/*.csv
-!/src/Client/
-!/src/Client/public/*.*
-!/src/Client/index.html
-!/src/Client/style.scss
-!/src/Client/Components/
-!/src/Lib/
-!/src/Lib/Scripts/
+!/src/Informedica.Formulary.Shared/
+!/src/Informedica.Formulary.Server/
+!/src/Informedica.Formulary.Server/resources/
+!/src/Informedica.Formulary.Server/resources/*.csv
+!/src/Informedica.Formulary.Server/Scripts/
+!/src/Informedica.Formulary.Server/Scripts/resources/
+!/src/Informedica.Formulary.Server/Scripts/resources/*.csv
+!/src/Informedica.Formulary.Client/
+!/src/Informedica.Formulary.Client/public/*.*
+!/src/Informedica.Formulary.Client/index.html
+!/src/Informedica.Formulary.Client/style.scss
+!/src/Informedica.Formulary.Client/Components/
+!/src/Informedica.Formulary.Client/Pages/
+!/src/Informedica.Formulary.Lib/
+!/src/Informedica.Formulary.Lib/Scripts/
 
 # Add test files
 

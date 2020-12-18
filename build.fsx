@@ -14,8 +14,8 @@ open Fake.IO
 
 Target.initEnvironment ()
 
-let serverPath = Path.getFullName "./src/Server"
-let clientPath = Path.getFullName "./src/Client"
+let serverPath = Path.getFullName "./src/Informedica.Formulary.Server"
+let clientPath = Path.getFullName "./src/Informedica.Formulary.Client"
 let clientDeployPath = Path.combine clientPath "deploy"
 let deployDir = Path.getFullName "./deploy"
 
@@ -89,10 +89,10 @@ Target.create "Run" (fun _ ->
     let client = async {
         runTool yarnTool "webpack-dev-server" __SOURCE_DIRECTORY__
     }
-    let browser = async {
-        do! Async.Sleep 5000
-        openBrowser "http://localhost:8080"
-    }
+    //let browser = async {
+    //    do! Async.Sleep 5000
+    //    openBrowser "http://localhost:8080"
+    //}
 
     let vsCodeSession = Environment.hasEnvironVar "vsCodeSession"
     let safeClientOnly = Environment.hasEnvironVar "safeClientOnly"

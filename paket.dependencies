@@ -19,6 +19,7 @@ group Server
     framework: netcoreapp3.1
     storage: none
 
+    nuget Newtonsoft.Json
     nuget FSharp.Data
     nuget Saturn
     nuget Fable.Remoting.Giraffe
@@ -49,6 +50,7 @@ group Client
     nuget Feliz.MaterialUI
     nuget Feliz.UseElmish
     nuget Feliz.MaterialUI.Pickers
+    nuget Thoth.Json
 
 group Build
     source https://api.nuget.org/v3/index.json

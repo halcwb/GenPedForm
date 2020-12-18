@@ -3,12 +3,6 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.30225.117
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Client", "src\Client\Client.fsproj", "{73E8E820-C8AA-47CC-BB2B-152CA4D0B855}"
-EndProject
-Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Server", "src\Server\Server.fsproj", "{73E8E820-C8AA-47CC-BB2B-152CA4D0B856}"
-EndProject
-Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Lib", "src\Lib\Lib.fsproj", "{B072AF42-4DF0-47C6-802A-A43D57CAA1BC}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{08CCFCF6-2248-43ED-A6EF-E972A2DA0E6A}"
 	ProjectSection(SolutionItems) = preProject
 		build.fsx = build.fsx
@@ -20,22 +14,30 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		yarn.lock = yarn.lock
 	EndProjectSection
 EndProject
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Informedica.Formulary.Lib", "src\Informedica.Formulary.Lib\Informedica.Formulary.Lib.fsproj", "{3A467D9D-7A2F-44AC-BE90-0930326E807E}"
+EndProject
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Informedica.Formulary.Server", "src\Informedica.Formulary.Server\Informedica.Formulary.Server.fsproj", "{85CA715D-C689-4D34-A35A-A4FEC02DD9E0}"
+EndProject
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Informedica.Formulary.Client", "src\Informedica.Formulary.Client\Informedica.Formulary.Client.fsproj", "{7FAAC209-689D-4887-94D0-90EA0ED5F335}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{73E8E820-C8AA-47CC-BB2B-152CA4D0B855}.Debug|Any CPU.ActiveCfg = Release|Any CPU
-		{73E8E820-C8AA-47CC-BB2B-152CA4D0B855}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{73E8E820-C8AA-47CC-BB2B-152CA4D0B856}.Debug|Any CPU.ActiveCfg = Release|Any CPU
-		{73E8E820-C8AA-47CC-BB2B-152CA4D0B856}.Debug|Any CPU.Build.0 = Release|Any CPU
-		{73E8E820-C8AA-47CC-BB2B-152CA4D0B856}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{73E8E820-C8AA-47CC-BB2B-152CA4D0B856}.Release|Any CPU.Build.0 = Release|Any CPU
-		{B072AF42-4DF0-47C6-802A-A43D57CAA1BC}.Debug|Any CPU.ActiveCfg = Release|Any CPU
-		{B072AF42-4DF0-47C6-802A-A43D57CAA1BC}.Debug|Any CPU.Build.0 = Release|Any CPU
-		{B072AF42-4DF0-47C6-802A-A43D57CAA1BC}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{B072AF42-4DF0-47C6-802A-A43D57CAA1BC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3A467D9D-7A2F-44AC-BE90-0930326E807E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3A467D9D-7A2F-44AC-BE90-0930326E807E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3A467D9D-7A2F-44AC-BE90-0930326E807E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3A467D9D-7A2F-44AC-BE90-0930326E807E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{85CA715D-C689-4D34-A35A-A4FEC02DD9E0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{85CA715D-C689-4D34-A35A-A4FEC02DD9E0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{85CA715D-C689-4D34-A35A-A4FEC02DD9E0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{85CA715D-C689-4D34-A35A-A4FEC02DD9E0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7FAAC209-689D-4887-94D0-90EA0ED5F335}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7FAAC209-689D-4887-94D0-90EA0ED5F335}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7FAAC209-689D-4887-94D0-90EA0ED5F335}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7FAAC209-689D-4887-94D0-90EA0ED5F335}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

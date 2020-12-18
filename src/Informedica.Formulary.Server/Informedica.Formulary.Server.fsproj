@@ -1,0 +1,25 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk.Web">
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>netcoreapp3.1</TargetFramework>
+        <AspNetCoreHostingModel>OutOfProcess</AspNetCoreHostingModel>
+        <AspNetCoreModuleName>AspNetCoreModule</AspNetCoreModuleName>
+    </PropertyGroup>
+    <ItemGroup>
+        <None Include="paket.references" />
+        <None Include="Scripts\Database.fsx" />
+        <None Include="Scripts/Data.fsx" />
+        <None Include="Scripts\Mapper.fsx" />
+        <Compile Include="Env.fs" />
+        <Compile Include="../Informedica.Formulary.Shared/Types.fs" />
+        <Compile Include="../Informedica.Formulary.Shared/Api.fs" />
+        <Compile Include="Mapper.fs" />
+        <Compile Include="Server.fs" />
+        <Compile Include="Program.fs" />
+    </ItemGroup>
+    <ItemGroup>
+      <ProjectReference Include="..\Informedica.Formulary.Lib\Informedica.Formulary.Lib.fsproj" />
+    </ItemGroup>
+    <Import Project="..\..\.paket\Paket.Restore.targets" />
+</Project>

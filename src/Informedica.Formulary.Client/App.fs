@@ -18,18 +18,20 @@ module App =
     let defaultTheme = Styles.createMuiTheme()
 
     type State =
-        { SelectedGeneric: string option
-          SelectedIndication: string option
-          SelectedRoute: string option
-          SelectedPatient: string option
-          Versions: Deferred<(int * DateTime) list>
-          Generics: Deferred<string list>
-          Indications: Deferred<string list>
-          Routes: Deferred<string list>
-          Patients: Deferred<string list>
-          Details: Deferred<string>
-          Categorized : Deferred<CategorizedGeneric list>
-          EditView : bool }
+        { 
+            SelectedGeneric: string option
+            SelectedIndication: string option
+            SelectedRoute: string option
+            SelectedPatient: string option
+            Versions: Deferred<(int * DateTime) list>
+            Generics: Deferred<string list>
+            Indications: Deferred<string list>
+            Routes: Deferred<string list>
+            Patients: Deferred<string list>
+            Details: Deferred<string>
+            Categorized : Deferred<CategorizedGeneric list>
+            EditView : bool 
+        }
 
 
     type Msg =
@@ -50,27 +52,35 @@ module App =
     module LoadCommands =
 
         let qry: Query =
-            { Generic = None
-              Indication = None
-              Route = None
-              Patient = None }
+            { 
+                Generic = None
+                Indication = None
+                Route = None
+                Patient = None 
+            }
 
         let loadVersions =
             async {
                 let! versions = Server.api.GetVersions()
-                return LoadVersions(Finished versions) } |> Cmd.fromAsync
+                return LoadVersions(Finished versions) 
+            } 
+            |> Cmd.fromAsync
 
         let loadGenerics =
             async {
                 let! generics = Server.api.GetGenerics()
-                return LoadGenerics(Finished generics) } |> Cmd.fromAsync
+                return LoadGenerics(Finished generics) 
+            } 
+            |> Cmd.fromAsync
 
         let loadIndications generic =
             match generic with
             | Some g ->
                 async {
                     let! indications = Server.api.GetIndications g
-                    return LoadIndications(Finished indications) } |> Cmd.fromAsync
+                    return LoadIndications(Finished indications) 
+                } 
+                |> Cmd.fromAsync
             | None -> Cmd.none
 
         let loadRoutes generic indication =
@@ -78,7 +88,9 @@ module App =
             | Some g, Some i ->
                 async {
                     let! routes = Server.api.GetRoutes g i
-                    return LoadRoutes(Finished routes) } |> Cmd.fromAsync
+                    return LoadRoutes(Finished routes) 
+                } 
+                |> Cmd.fromAsync
             | _ -> Cmd.none
 
 
@@ -87,32 +99,43 @@ module App =
             | Some g, Some i, Some r ->
                 async {
                     let! pats = Server.api.GetPatients g i r
-                    return LoadPatients(Finished pats) } |> Cmd.fromAsync
+                    return LoadPatients(Finished pats) 
+                } 
+                |> Cmd.fromAsync
             | _ -> Cmd.none
 
         let loadMarkdown qry =
             async {
                 let! details = Server.api.GetMarkdown qry
-                return LoadMarkdown(Finished details) } |> Cmd.fromAsync
+                return LoadMarkdown(Finished details) 
+            } 
+            |> Cmd.fromAsync
 
 
     let initialState =
-        { SelectedGeneric = None
-          SelectedIndication = None
-          SelectedRoute = None
-          SelectedPatient = None
-          Versions = InProgress
-          Generics = InProgress
-          Indications = HasNotStartedYet
-          Routes = HasNotStartedYet
-          Patients = HasNotStartedYet
-          Details = HasNotStartedYet
-          Categorized = HasNotStartedYet
-          EditView = false }
+        { 
+            SelectedGeneric = None
+            SelectedIndication = None
+            SelectedRoute = None
+            SelectedPatient = None
+            Versions = InProgress
+            Generics = InProgress
+            Indications = HasNotStartedYet
+            Routes = HasNotStartedYet
+            Patients = HasNotStartedYet
+            Details = HasNotStartedYet
+            Categorized = HasNotStartedYet
+            EditView = false 
+        }
 
     let init(): State * Cmd<Msg> =
 
-        let loadCmd = [ LoadCommands.loadGenerics; LoadCommands.loadVersions ] |> Cmd.batch
+        let loadCmd = 
+            [ 
+                LoadCommands.loadGenerics
+                LoadCommands.loadVersions 
+            ] 
+            |> Cmd.batch
 
         initialState, loadCmd
 
@@ -122,10 +145,14 @@ module App =
         | ToggleEdit -> 
             let cmd = 
                 async {
+                    
                     let! cgs = 
-                        Server.api.GetCategorized "abacavir"
+                        state.SelectedGeneric 
+                        |> Option.defaultValue ""
+                        |> Server.api.GetCategorized 
                     return LoadCategorized(Finished cgs) 
-                } |> Cmd.fromAsync
+                } 
+                |> Cmd.fromAsync
             // this isn't working see issue: https://github.com/Zaid-Ajaj/Fable.SimpleJson/issues/61
             let cmdAsString = 
                 async {
@@ -153,13 +180,14 @@ module App =
                             |> List.map (Json.parseNativeAs<CategorizedGeneric>)
                         )
                     return LoadCategorized(Finished cgs) 
-                } |> Cmd.fromAsync
+                } 
+                |> Cmd.fromAsync
 
             { state with EditView = not state.EditView }, cmd
 
         | LoadCategorized(Finished(Ok gcs)) ->
             printfn "received %i" (gcs |> List.length)
-            state, Cmd.none
+            { state with Categorized = Resolved gcs } , Cmd.none
 
         | LoadCategorized(Finished(Error e)) ->
             printfn "error %s" e
@@ -171,7 +199,8 @@ module App =
             let state =
                 { state with
                       SelectedIndication = generics |> List.tryExactlyOne
-                      Generics = Resolved generics }
+                      Generics = Resolved generics 
+                }
 
             let state, cmds =
                 if state.SelectedGeneric |> Option.isNone then
@@ -181,10 +210,13 @@ module App =
                           Indications = InProgress
                           Routes = HasNotStartedYet
                           Patients = HasNotStartedYet
-                          Details = InProgress },
-                    [ { LoadCommands.qry with Generic = state.SelectedGeneric } |> LoadCommands.loadMarkdown
-
-                      LoadCommands.loadIndications state.SelectedGeneric ]
+                          Details = InProgress 
+                    },
+                    [ 
+                        { LoadCommands.qry with Generic = state.SelectedGeneric } 
+                        |> LoadCommands.loadMarkdown
+                        LoadCommands.loadIndications state.SelectedGeneric 
+                    ]
                     |> Cmd.batch
 
             state, cmds
@@ -194,7 +226,8 @@ module App =
                 { state with
                       SelectedIndication = indications |> List.tryExactlyOne
                       Indications = Resolved indications
-                      Routes = InProgress }
+                      Routes = InProgress 
+                }
 
             let state, cmds =
                 if state.SelectedIndication |> Option.isNone then
@@ -203,13 +236,16 @@ module App =
                     { state with
                           Routes = InProgress
                           Patients = HasNotStartedYet
-                          Details = InProgress },
-                    [ { LoadCommands.qry with
+                          Details = InProgress 
+                    },
+                    [ 
+                        { LoadCommands.qry with
                             Generic = state.SelectedGeneric
-                            Indication = state.SelectedIndication }
-                      |> LoadCommands.loadMarkdown
-
-                      LoadCommands.loadRoutes state.SelectedGeneric state.SelectedIndication ]
+                            Indication = state.SelectedIndication 
+                        }
+                        |> LoadCommands.loadMarkdown
+                        LoadCommands.loadRoutes state.SelectedGeneric state.SelectedIndication 
+                    ]
                     |> Cmd.batch
 
             state, cmds
@@ -218,7 +254,8 @@ module App =
             let state =
                 { state with
                       SelectedRoute = routes |> List.tryExactlyOne
-                      Routes = Resolved routes }
+                      Routes = Resolved routes 
+                }
 
             let state, cmds =
                 if state.SelectedRoute |> Option.isNone then
@@ -226,14 +263,16 @@ module App =
                 else
                     { state with
                           Patients = InProgress
-                          Details = InProgress },
-                    [ { LoadCommands.qry with
+                          Details = InProgress 
+                    },
+                    [ 
+                        { LoadCommands.qry with
                             Generic = state.SelectedGeneric
                             Indication = state.SelectedIndication
-                            Route = state.SelectedRoute }
-                      |> LoadCommands.loadMarkdown
-
-                      LoadCommands.loadPatients state.SelectedGeneric state.SelectedIndication state.SelectedRoute ]
+                            Route = state.SelectedRoute 
+                        }
+                        |> LoadCommands.loadMarkdown
+                        LoadCommands.loadPatients state.SelectedGeneric state.SelectedIndication state.SelectedRoute ]
                     |> Cmd.batch
 
             state, cmds
@@ -242,20 +281,23 @@ module App =
             let state =
                 { state with
                       SelectedPatient = pats |> List.tryExactlyOne
-                      Patients = Resolved pats }
-
+                      Patients = Resolved pats 
+                }
 
             let state, cmds =
                 if state.SelectedPatient |> Option.isNone then
                     state, Cmd.none
                 else
                     { state with Details = InProgress },
-                    [ { LoadCommands.qry with
+                    [ 
+                        { LoadCommands.qry with
                             Generic = state.SelectedGeneric
                             Indication = state.SelectedIndication
                             Route = state.SelectedRoute
-                            Patient = state.SelectedPatient }
-                      |> LoadCommands.loadMarkdown ]
+                            Patient = state.SelectedPatient 
+                        }
+                        |> LoadCommands.loadMarkdown 
+                    ]
                     |> Cmd.batch
 
             state, cmds
@@ -279,11 +321,15 @@ module App =
                       Indications = InProgress
                       Routes = HasNotStartedYet
                       Patients = HasNotStartedYet
-                      Details = InProgress }, cmds
+                      Details = InProgress 
+                }, 
+                cmds
             else
                 { initialState with
                     Versions = state.Versions
-                    Generics = state.Generics }, Cmd.none
+                    Generics = state.Generics 
+                }, 
+                Cmd.none
 
         | SelectIndication indication ->
             if indication = "" then
@@ -293,24 +339,31 @@ module App =
                       SelectedIndication = None
                       Routes = HasNotStartedYet
                       Patients = HasNotStartedYet
-                      Details = InProgress }, LoadCommands.loadMarkdown qry
+                      Details = InProgress 
+                }, 
+                LoadCommands.loadMarkdown qry
 
             else
                 let qry =
                     { LoadCommands.qry with
                           Generic = state.SelectedGeneric
-                          Indication = Some indication }
+                          Indication = Some indication 
+                    }
 
                 let cmds =
-                    [ LoadCommands.loadMarkdown qry
-                      LoadCommands.loadRoutes state.SelectedGeneric (Some indication) ]
+                    [ 
+                        LoadCommands.loadMarkdown qry
+                        LoadCommands.loadRoutes state.SelectedGeneric (Some indication) 
+                    ]
                     |> Cmd.batch
 
                 { state with
                       SelectedIndication = Some indication
                       Routes = InProgress
                       Patients = HasNotStartedYet
-                      Details = InProgress }, cmds
+                      Details = InProgress 
+                }, 
+                cmds
 
         | SelectRoute route ->
             if route = "" then
@@ -322,24 +375,31 @@ module App =
                 { state with
                       SelectedRoute = None
                       Patients = HasNotStartedYet
-                      Details = InProgress }, LoadCommands.loadMarkdown qry
+                      Details = InProgress 
+                }, 
+                LoadCommands.loadMarkdown qry
 
             else
                 let qry =
                     { LoadCommands.qry with
                           Generic = state.SelectedGeneric
                           Indication = state.SelectedIndication
-                          Route = Some route }
+                          Route = Some route 
+                    }
 
                 let cmds =
-                    [ LoadCommands.loadMarkdown qry
-                      LoadCommands.loadPatients state.SelectedGeneric state.SelectedIndication (Some route) ]
+                    [ 
+                        LoadCommands.loadMarkdown qry
+                        LoadCommands.loadPatients state.SelectedGeneric state.SelectedIndication (Some route) 
+                    ]
                     |> Cmd.batch
 
                 { state with
                       SelectedRoute = Some route
                       Patients = InProgress
-                      Details = InProgress }, cmds
+                      Details = InProgress 
+                }, 
+                cmds
 
 
         | SelectPatient patient ->
@@ -360,11 +420,14 @@ module App =
                           Generic = state.SelectedGeneric
                           Indication = state.SelectedIndication
                           Route = state.SelectedRoute
-                          Patient = Some patient }
+                          Patient = Some patient 
+                    }
 
                 { state with
                       SelectedPatient = Some patient
-                      Details = InProgress }, LoadCommands.loadMarkdown qry
+                      Details = InProgress 
+                }, 
+                LoadCommands.loadMarkdown qry
 
         | _ -> state, Cmd.none
 
@@ -382,55 +445,67 @@ module App =
 
 
     let createFilter generics indications routes patients dispatch =
-        [ match generics with
-          | Resolved generics ->
-              { Autocomplete.props with
+        [ 
+            match generics with
+            | Resolved generics ->
+                { Autocomplete.props with
                     Dispatch = (SelectGeneric >> dispatch)
                     Options = generics |> List.sort
                     Label = sprintf "Zoek een generiek (van %i totaal)" (generics |> List.length)
-                    Filter = Filter.StartsWith }
-              |> Autocomplete.render
-          | _ -> ()
+                    Filter = Filter.StartsWith 
+                }
+                |> Autocomplete.render
+            | _ -> ()
 
-          match indications with
-          | Resolved indications ->
-              Html.div
-                  [ prop.style [ style.marginTop 20 ]
-                    prop.children
-                        [ { Autocomplete.props with
-                                Dispatch = SelectIndication >> dispatch
-                                Options = indications |> List.sort
-                                Label = sprintf "Kies een indicatie (van %i totaal)" (indications |> List.length)
-                                Filter = Filter.ContainsCaseSensitive }
-                          |> Autocomplete.render ] ]
+            match indications with
+            | Resolved indications ->
+                Html.div [ 
+                    prop.style [ 
+                        style.marginTop 20 
+                    ]
+                    prop.children [ 
+                        { Autocomplete.props with
+                            Dispatch = SelectIndication >> dispatch
+                            Options = indications |> List.sort
+                            Label = sprintf "Kies een indicatie (van %i totaal)" (indications |> List.length)
+                            Filter = Filter.ContainsCaseSensitive 
+                        }
+                        |> Autocomplete.render 
+                    ] 
+                ]
 
-          | _ -> ()
+            | _ -> ()
 
-          match routes with
-          | Resolved routes ->
-              Html.div
-                  [ prop.style [ style.marginTop 20 ]
-                    prop.children
-                        [ { Autocomplete.props with
+            match routes with
+            | Resolved routes ->
+                Html.div [ 
+                    prop.style [ style.marginTop 20 ]
+                    prop.children [ 
+                        { Autocomplete.props with
                                 Dispatch = SelectRoute >> dispatch
                                 Options = routes |> List.sort
                                 Label = sprintf "Kies een route (van %i totaal)" (routes |> List.length)
                                 Filter = Filter.StartsWith }
-                          |> Autocomplete.render ] ]
-          | _ -> ()
+                        |> Autocomplete.render 
+                    ] 
+                ]
+            | _ -> ()
 
-          match patients with
-          | Resolved pats ->
-              Html.div
-                  [ prop.style [ style.marginTop 20 ]
-                    prop.children
-                        [ { Autocomplete.props with
-                                Dispatch = SelectPatient >> dispatch
-                                Options = pats
-                                Label = sprintf "Kies een patient (van %i totaal)" (pats |> List.length)
-                                Filter = Filter.StartsWith }
-                          |> Autocomplete.render ] ]
-          | _ -> () ]
+            match patients with
+            | Resolved pats ->
+                Html.div [ 
+                    prop.style [ style.marginTop 20 ]
+                    prop.children [ 
+                        { Autocomplete.props with
+                            Dispatch = SelectPatient >> dispatch
+                            Options = pats
+                            Label = sprintf "Kies een patient (van %i totaal)" (pats |> List.length)
+                            Filter = Filter.StartsWith }
+                        |> Autocomplete.render 
+                    ] 
+                ]
+            | _ -> () 
+        ]
 
     let render (state: State) (dispatch: Msg -> unit) =
         let filter = createFilter state.Generics state.Indications state.Routes state.Patients dispatch
@@ -438,42 +513,77 @@ module App =
         let details =
             match state.Details with
             | HasNotStartedYet -> "## Geen generiek gekozen"
-            | InProgress -> "## Doseringen worden opgehaald ..."
-            | Resolved s -> s.Trim()
+            | InProgress       -> "## Doseringen worden opgehaald ..."
+            | Resolved s -> s.Trim().Replace("    ", "")
             |> markdown.source
             |> List.singleton
             |> List.append [ markdown.escapeHtml false ]
             |> Markdown.markdown
 
-        Mui.themeProvider
-            [ themeProvider.theme defaultTheme
-              themeProvider.children
-                  [ Html.div
-                      [ [ Fable.MaterialUI.Icons.menuIcon "", (fun _ -> ToggleEdit |> dispatch) ]
-                        |> Components.TitleBar.render (state.Versions |> printTitle)
 
-                        if state.EditView then 
-                            Html.div [ 
-                                prop.style [ style.marginTop 100 ]
-                                prop.text "Edit view" 
-                            ]
-                        else 
-                            Mui.container
-                                [ prop.style
-                                    [ style.marginTop 90
-                                      style.padding 10 ]
-                                  container.maxWidth.md
-                                  prop.children
-                                      [ // search
-                                        Html.div
-                                            [ prop.style [ style.padding 10 ]
-                                              paper.children filter ]
-                                        match state.Generics with
-                                        | Resolved _ ->
-                                            // details
-                                            Mui.paper
-                                                [ prop.style
-                                                    [ style.padding 10
-                                                      style.color Colors.indigo.``900`` ]
-                                                  prop.children [ details ] ]
-                                        | _ -> Html.none ] ] ] ] ]
+        let titleBar = 
+            [ Fable.MaterialUI.Icons.menuIcon "", (fun _ -> ToggleEdit |> dispatch) ]
+            |> Components.TitleBar.render (state.Versions |> printTitle)
+
+        let doseEdit = 
+            Html.div [ 
+                prop.style [ style.marginTop 100 ]
+                prop.children[
+                    state.Categorized
+                    |> function
+                    | Resolved(cgs) ->
+                        cgs
+                        |> Pages.DoseEdit.render
+                    | _ -> Html.div [ prop.text "No show." ]
+
+                ]
+            ]
+
+        let doseSearch =
+            Html.div [
+                // search
+                Html.div [ 
+                    prop.style [ style.padding 10 ]
+                    paper.children filter 
+                ]
+                
+                match state.Generics with
+                | Resolved _ ->
+                    // details
+                    Mui.paper [ 
+                        prop.style [ 
+                            style.padding 10
+                            style.color Colors.indigo.``900`` 
+                        ]
+                        prop.children [ details ] 
+                    ]
+                | _ -> Html.none 
+            ]
+
+
+        Mui.themeProvider [ 
+            themeProvider.theme defaultTheme
+            themeProvider.children [ 
+                Html.div [ 
+                    titleBar
+
+                    Mui.container [ 
+                        prop.style [ 
+                            style.marginTop 90
+                            style.padding 10 
+                        ]
+                        container.maxWidth.md
+                        prop.children [ 
+                            if state.EditView then doseEdit
+                            else 
+                                doseSearch 
+                        ] 
+                    ] 
+                ] 
+            ] 
+        ]
+
+
+
+
+

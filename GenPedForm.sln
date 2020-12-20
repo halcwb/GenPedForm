@@ -20,6 +20,11 @@ Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Informedica.Formulary.Serve
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Informedica.Formulary.Client", "src\Informedica.Formulary.Client\Informedica.Formulary.Client.fsproj", "{7FAAC209-689D-4887-94D0-90EA0ED5F335}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Scripts", "Scripts", "{667686C1-DCDC-456D-B121-D0273CCA823E}"
+	ProjectSection(SolutionItems) = preProject
+		Script.fsx = Script.fsx
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU

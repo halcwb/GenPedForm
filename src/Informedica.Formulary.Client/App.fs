@@ -157,33 +157,19 @@ module App =
             let cmdAsString = 
                 async {
                     let! cgs = 
-                        Server.api.GetCategorizedAsString "abacavir"
+                        state.SelectedGeneric
+                        |> Option.defaultValue ""
+                        |> Server.api.GetCategorizedAsString 
                     //cgs 
                     //|> fun x -> Browser.Dom.console.log("result", x)
                     let cgs = 
                         cgs
-                        |> Result.map (fun cgs -> 
-                            printfn "mapping %i" (cgs |> List.length)
-                            cgs
-                            |> List.head
-                            |> fun x -> 
-                                Browser.Dom.console.log("json", x)
-                                Browser.Dom.console.log("parse", 
-                                    x 
-                                    |> Json.tryParseNativeAs<CategorizedGeneric>
-                                    |> function 
-                                    | Ok _    -> "parsing worked"
-                                    | Error e -> e
-                                )
-
-                            cgs
-                            |> List.map (Json.parseNativeAs<CategorizedGeneric>)
-                        )
+                        |> Result.map (List.map (Json.parseNativeAs<CategorizedGeneric>))
                     return LoadCategorized(Finished cgs) 
                 } 
                 |> Cmd.fromAsync
 
-            { state with EditView = not state.EditView }, cmd
+            { state with EditView = not state.EditView }, cmdAsString
 
         | LoadCategorized(Finished(Ok gcs)) ->
             printfn "received %i" (gcs |> List.length)
@@ -507,6 +493,7 @@ module App =
             | _ -> () 
         ]
 
+
     let render (state: State) (dispatch: Msg -> unit) =
         let filter = createFilter state.Generics state.Indications state.Routes state.Patients dispatch
 
@@ -527,14 +514,26 @@ module App =
 
         let doseEdit = 
             Html.div [ 
-                prop.style [ style.marginTop 100 ]
+//                prop.style [ style.marginTop 100 ]
                 prop.children[
                     state.Categorized
                     |> function
+                    | HasNotStartedYet ->
+                        Html.div [
+                            Mui.typography [
+                                prop.text "Gegevens worden opgehaald..."
+                            ]
+                        ]
+
                     | Resolved(cgs) ->
                         cgs
                         |> Pages.DoseEdit.render
-                    | _ -> Html.div [ prop.text "No show." ]
+                    | InProgress -> 
+                        Html.div [
+                            Mui.typography [
+                                prop.text "Gegevens worden opgehaald..."
+                            ]
+                        ]
 
                 ]
             ]

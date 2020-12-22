@@ -15,6 +15,37 @@ module ServerApi =
 
     open Newtonsoft
 
+    module Json =
+        open Fable.Remoting.Json
+        open Newtonsoft.Json
+        open System.IO
+        open System.Text
+        
+        let private fableConverter = new FableJsonConverter() :> JsonConverter
+        
+        let private settings = JsonSerializerSettings(DateParseHandling = DateParseHandling.None)
+        
+        let private fableSerializer =
+            let serializer = JsonSerializer()
+            serializer.Converters.Add fableConverter
+            serializer
+        
+        let private jsonEncoding = UTF8Encoding false
+        
+        let jsonSerialize (o: 'a) (stream: Stream) =
+            use sw = new StreamWriter (stream, jsonEncoding, 1024, true)
+            use writer = new JsonTextWriter (sw, CloseOutput = false)
+            fableSerializer.Serialize (writer, o)
+        
+        let serialize o =
+            use stream = new MemoryStream()
+            use reader = new StreamReader(stream)
+            jsonSerialize o stream
+            stream.Position <- 0L
+            reader.ReadToEnd()
+        
+        
+
     open Categorize
 
     let getVersions = 
@@ -35,7 +66,7 @@ module ServerApi =
             )
             |> Categorize.mapDoses
 //            |> List.map Mapper.mapCategorizedGeneric_
-            |> List.map Json.JsonConvert.SerializeObject
+            |> List.map Json.serialize
         |> Memoization.memoize 
 
     let getCategorized conn =

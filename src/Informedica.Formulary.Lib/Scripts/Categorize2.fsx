@@ -78,7 +78,7 @@ initCategory
     printfn "=== Start ==="
     Doses.getDoses s
 //    |> List.take 500
-    |> List.filter (fun d -> d.Generic = "gentamicine" && d.Route = "iv")
+    |> List.filter (fun d -> d.Generic = "paracetamol" && d.Route = "iv")
     |> mapDoses
     |> List.take 1
     |> List.iter (fun d ->

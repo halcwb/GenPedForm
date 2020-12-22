@@ -13,6 +13,7 @@
         <Compile Include="Version.fs" />
         <Compile Include="Extensions.fs" />
         <Compile Include="Server.fs" />
+        <Compile Include="Utils.fs" />
         <Compile Include="Components/Autocomplete.fs" />
         <Compile Include="Components\TitleBar.fs" />
         <Compile Include="Pages\DoseEdit.fs" />

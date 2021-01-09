@@ -10,7 +10,8 @@ module App =
     open Thoth.Json
     open Fable.SimpleJson
     open System
-    open Informedica.Formulary.Shared.Types
+    open Informedica.Formulary.Shared.Types.DoseTypes
+    open Informedica.Formulary.Shared.Types.QueryTypes
     open Components
 
     module Filter = Autocomplete.Filter
@@ -30,6 +31,7 @@ module App =
             Patients: Deferred<string list>
             Details: Deferred<string>
             Categorized : Deferred<CategorizedGeneric list>
+            Frequencies : Deferred<string list>
             EditView : bool 
         }
 
@@ -42,6 +44,7 @@ module App =
         | LoadPatients of AsyncOperationStatus<Result<string list, string>>
         | LoadMarkdown of AsyncOperationStatus<Result<string, string>>
         | LoadCategorized of AsyncOperationStatus<Result<CategorizedGeneric list, string>>
+        | LoadFrequencies of AsyncOperationStatus<Result<string list, string>>
         | SelectGeneric of string
         | SelectIndication of string
         | SelectRoute of string
@@ -125,6 +128,7 @@ module App =
             Patients = HasNotStartedYet
             Details = HasNotStartedYet
             Categorized = HasNotStartedYet
+            Frequencies = HasNotStartedYet
             EditView = false 
         }
 
@@ -143,39 +147,40 @@ module App =
     let update (msg: Msg) (state: State): State * Cmd<Msg> =
         match msg with
         | ToggleEdit -> 
-            let cmd = 
+            let cmdFreqs =
                 async {
-                    
-                    let! cgs = 
-                        state.SelectedGeneric 
-                        |> Option.defaultValue ""
-                        |> Server.api.GetCategorized 
-                    return LoadCategorized(Finished cgs) 
-                } 
-                |> Cmd.fromAsync
-            // this isn't working see issue: https://github.com/Zaid-Ajaj/Fable.SimpleJson/issues/61
-            let cmdAsString = 
+                    let! freqs = Server.api.GetFrequencies ()
+                    return LoadFrequencies(Finished freqs)
+                }
+                
+            let cmdCategorized = 
                 async {
                     let! cgs = 
                         state.SelectedGeneric
                         |> Option.defaultValue ""
                         |> Server.api.GetCategorizedAsString 
-                    //cgs 
-                    //|> fun x -> Browser.Dom.console.log("result", x)
                     let cgs = 
                         cgs
                         |> Result.map (List.map (Json.parseNativeAs<CategorizedGeneric>))
                     return LoadCategorized(Finished cgs) 
                 } 
-                |> Cmd.fromAsync
 
-            { state with EditView = not state.EditView }, cmdAsString
+            { state with EditView = not state.EditView }, 
+            [ cmdFreqs; cmdCategorized ] |> List.map Cmd.fromAsync |> Cmd.batch
 
         | LoadCategorized(Finished(Ok gcs)) ->
             printfn "received %i" (gcs |> List.length)
             { state with Categorized = Resolved gcs } , Cmd.none
 
         | LoadCategorized(Finished(Error e)) ->
+            printfn "error %s" e
+            state, Cmd.none
+
+        | LoadFrequencies(Finished(Ok freqs)) ->
+            printfn "received %i" (freqs |> List.length)
+            { state with Frequencies = Resolved freqs } , Cmd.none
+
+        | LoadFrequencies(Finished(Error e)) ->
             printfn "error %s" e
             state, Cmd.none
 
@@ -425,7 +430,7 @@ module App =
             |> List.sortBy fst
             |> List.rev
             |> List.head
-            |> (fun (v, d) -> sprintf " (versie: %i, %s)" v (d.ToString("dd-MM-yyyy")))
+            |> (fun (v, d) -> sprintf " | Versie: %i | %s" v (d.ToString("dd-MM-yyyy")))
             |> sprintf "Afspraken Programma Formularium %s"
         | _ -> "Afspraken Programma Formularium"
 
@@ -516,19 +521,12 @@ module App =
             Html.div [ 
 //                prop.style [ style.marginTop 100 ]
                 prop.children[
-                    state.Categorized
+                    (state.Categorized, state.Frequencies)
                     |> function
-                    | HasNotStartedYet ->
-                        Html.div [
-                            Mui.typography [
-                                prop.text "Gegevens worden opgehaald..."
-                            ]
-                        ]
-
-                    | Resolved(cgs) ->
-                        cgs
+                    | Resolved(cgs), Resolved(freqs) ->
+                        (cgs, freqs)
                         |> Pages.DoseEdit.render
-                    | InProgress -> 
+                    | _ -> 
                         Html.div [
                             Mui.typography [
                                 prop.text "Gegevens worden opgehaald..."
@@ -564,20 +562,21 @@ module App =
             themeProvider.theme defaultTheme
             themeProvider.children [ 
                 Html.div [ 
-                    titleBar
-
-                    Mui.container [ 
-                        prop.style [ 
-                            style.marginTop 90
-                            style.padding 10 
-                        ]
-                        container.maxWidth.md
-                        prop.children [ 
-                            if state.EditView then doseEdit
-                            else 
-                                doseSearch 
-                        ] 
-                    ] 
+                    prop.children [
+                        titleBar
+                        Mui.container [ 
+                            prop.style [ 
+                                style.marginTop 90
+                                style.padding 10 
+                            ]
+                            container.maxWidth.md
+                            prop.children [ 
+                                if state.EditView then doseEdit
+                                else 
+                                    doseSearch 
+                            ] 
+                        ]                     
+                    ]
                 ] 
             ] 
         ]

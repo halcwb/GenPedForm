@@ -78,10 +78,20 @@ module Double =
 module Utils =
 
     open System
-    open Informedica.Formulary.Shared.Types
+    open Informedica.Formulary.Shared.Types.DoseTypes
     
     
-    let printDose (d : Dose) =
+
+    let printTimeUnit min max = 
+        match min, max with
+        | None, None        -> ""
+        | Some (t, u), None -> sprintf "min %i %s" t u
+        | None, Some (t, u)  -> sprintf "max %i %s" t u
+        | Some (t1, u), Some (t2, _) ->
+            sprintf "%i - %i %s" t1 t2 u
+
+
+    let printSubstanceDose freqs (d : SubstanceDose) =
         let format d =
             let itostr = Int32.toStringNumberNL
             let dtostr = Double.toStringNumberNLWithoutTrailingZeros
@@ -157,7 +167,7 @@ module Utils =
             | Some max, None ->
                 let max = max |> printQ d.Unit
                 let time =
-                    d.Freqs
+                    freqs
                     |> Seq.fold (fun _ f ->
                         f.Time |> snd
                     ) ""
@@ -171,13 +181,54 @@ module Utils =
                 let keer = keer |> printQ d.Unit
                 let max = max |> printQ d.Unit
                 let time =
-                    d.Freqs
+                    freqs
                     |> Seq.fold (fun _ f ->
                         f.Time |> snd
                     ) ""
                 if s = "" then 
                     sprintf "**max %s per %s en max %s per keer**" max time keer
                 else sprintf "%s (max %s per %s en max %s per keer)" s max time keer
+
+
+    let printFreqs (fs : Frequency list) =
+        fs
+        |> List.distinct
+        |> List.groupBy (fun f -> f.Time)
+        |> List.map (fun (t, fs) ->
+            let c =
+                fs
+                |> List.sortBy (fun f -> f.Count)
+                |> List.map (fun f -> f.Count |> sprintf "%A")
+                |> String.concat ", "
+
+            match (t |> fst) with
+            | x when x = 1 -> 
+                sprintf "%s x / %s" c (t |> snd)
+            | _ -> 
+                sprintf "%s x / %i %s" c (t |> fst) (t |> snd)
+        )
+        |> String.concat ", "
+
+
+    let printItem (di : DoseItem) =
+        di.Frequencies 
+        |> printFreqs
+        |> sprintf "in %s"
+        |> fun s ->
+            printTimeUnit di.MinDuration di.MaxDuration
+            |> sprintf "%s\ngedurende %s" s
+        |> fun s ->
+            di.SubstanceDoses
+            |> List.map (printSubstanceDose di.Frequencies)
+            |> String.concat "\n"
+            |> sprintf "%s\n%s" s
+        
+
+    let print (ds : DoseSchema) =
+        ds
+        |> List.map printItem
+        |> String.concat "/n"
+
 
 
 
@@ -250,7 +301,7 @@ module Utils =
         | RootCategory -> ""
         | Gender g -> g |> genderToStr
         | GestationAge mm -> mm |> minMaxToStr (int >> printDays) |> sprintf "zwangerschapsduur: %s weken"
-        | PostConceptionalAge mm -> mm |> minMaxToStr (int >> printDays) |> sprintf "post Conceptie Leeftijd: %s"
+        | PostConceptionalAge mm -> mm |> minMaxToStr (int >> printDays) |> sprintf "post conceptie leeftijd: %s"
         | Weight mm -> mm |> minMaxToStr toStr |> sprintf "gewicht: %s kg"
         | BodySurfaceArea mm -> mm |> minMaxToStr toStr |> sprintf "lichaamsoppervlak: %s m2"
         | Age mm -> mm |> minMaxToStr printAge |> sprintf "leeftijd: %s"
@@ -262,7 +313,7 @@ module Utils =
             match cod with
             | Dose d ->
                 match d with
-                | Some d -> d |> printDose
+                | Some d -> d |> print
                 | None   -> "geen dosering\n"
                 |> String.replace "*" ""
                 |> sprintf "%s: %s" s

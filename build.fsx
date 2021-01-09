@@ -33,7 +33,7 @@ let platformTool tool winTool =
         failwith errorMsg
 
 let nodeTool = platformTool "node" "node.exe"
-let yarnTool = platformTool "yarn" "yarn.cmd"
+let npmTool = platformTool "npm" "npm.cmd"
 
 let runTool cmd args workingDir =
     let arguments = args |> String.split ' ' |> Arguments.OfArgs
@@ -67,9 +67,9 @@ Target.create "Clean" (fun _ ->
 Target.create "InstallClient" (fun _ ->
     printfn "Node version:"
     runTool nodeTool "--version" __SOURCE_DIRECTORY__
-    printfn "Yarn version:"
-    runTool yarnTool "--version" __SOURCE_DIRECTORY__
-    runTool yarnTool "install --frozen-lockfile" __SOURCE_DIRECTORY__
+    printfn "npm version:"
+    runTool npmTool "--version" __SOURCE_DIRECTORY__
+    runTool npmTool "install --frozen-lockfile" __SOURCE_DIRECTORY__
 )
 
 Target.create "Build" (fun _ ->
@@ -79,7 +79,7 @@ Target.create "Build" (fun _ ->
        ("let app = \"" + release.NugetVersion + "\"")
         System.Text.Encoding.UTF8
         (Path.combine clientPath "Version.fs")
-    runTool yarnTool "webpack-cli -p" __SOURCE_DIRECTORY__
+    runTool nodeTool "webpack-cli -p" __SOURCE_DIRECTORY__
 )
 
 Target.create "Run" (fun _ ->
@@ -87,7 +87,8 @@ Target.create "Run" (fun _ ->
         runDotNet "watch run" serverPath
     }
     let client = async {
-        runTool yarnTool "webpack-dev-server" __SOURCE_DIRECTORY__
+        runDotNet "fable watch --outDir build --run webpack-dev-server" clientPath
+//        runTool yarnTool "webpack-dev-server" __SOURCE_DIRECTORY__
     }
     //let browser = async {
     //    do! Async.Sleep 5000

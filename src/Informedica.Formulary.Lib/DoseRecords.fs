@@ -1,6 +1,6 @@
 ﻿namespace Informedica.Formulary.Lib
 
-module Doses =
+module DoseRecords =
 
     open System
 
@@ -31,14 +31,16 @@ module Doses =
             MaxGestAgeDays = None
             MinPMAgeDays = None
             MaxPMAgeDays = None
+            Name = ""
             Freqs = []
+            MinDuration = None
+            MaxDuration = None
             Unit = ""
             NormDose = None
             MinDose = None
             MaxDose = None
             AbsMaxDose = None
             MaxPerDose = None
-            StartDose = None
             Products = []
         }
     
@@ -125,7 +127,7 @@ module Doses =
             []
 
 
-    let getDoses connString : Dose list =
+    let getDoses connString : DoseRecord list =
         connString
         |> Sql.connect
         |> Sql.query Queries.getDoseLatest
@@ -169,12 +171,15 @@ module Doses =
                 MaxGestAgeDays = intOrNone "MaxGestAge"
                 MinPMAgeDays = intOrNone "MinPMAge"
                 MaxPMAgeDays = intOrNone "MaxPMAge"
+                Name = ""
                 Freqs = 
                     optStr "Frequencies" 
                     |> String.split "||"
                     |> List.map parseFreq
                     |> List.filter Option.isSome
                     |> List.map Option.get
+                MinDuration = None
+                MaxDuration = None
                 Unit = optStr "DoseUnit"
                 NormDose = dose "NormDose"
                 MinDose = dose "MinDose"
@@ -191,7 +196,6 @@ module Doses =
                         if v = 0. then None
                         else v |> Quantity |> Some
                     )
-                StartDose = None
                 Products = []
             }
         )
@@ -227,7 +231,7 @@ module Doses =
             []
 
 
-    let sortPat (d: Dose) =
+    let sortPat (d: DoseRecord) =
         let inline toInt x =
             match x with
             | Some x -> x |> int
@@ -241,7 +245,7 @@ module Doses =
         (d.MinPMAgeDays |> toInt) 
 
 
-    let printDose (d : Dose) =
+    let printDose (d : DoseRecord) =
         let format d =
             let itostr = Int32.toStringNumberNL
             let dtostr = Double.toStringNumberNLWithoutTrailingZeros
@@ -469,7 +473,7 @@ module Doses =
 
 
 
-    let printPat (d : Dose) =
+    let printPat (d : DoseRecord) =
         printPatCat
             d.Gender
             d.MinAgeMo 
@@ -484,7 +488,7 @@ module Doses =
 
     /// See for use of anonymous record in 
     /// fold: https://github.com/dotnet/fsharp/issues/6699
-    let toMarkdown (ds : Types.Dose list) =
+    let toMarkdown (ds : Types.DoseRecord list) =
         let generic_md = """
     # {generic}
     ---

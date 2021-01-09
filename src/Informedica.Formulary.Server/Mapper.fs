@@ -19,5 +19,5 @@ module Mapper =
     
     let mapCategorizedGeneric_ (cg : Types.CategorizedGeneric) =
         cg
-        |> mapType<_, Shared.Types.CategorizedGeneric>
+        |> mapType<_, Shared.Types.DoseTypes.CategorizedGeneric>
 

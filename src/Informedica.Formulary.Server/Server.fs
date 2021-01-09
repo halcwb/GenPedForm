@@ -49,13 +49,13 @@ module ServerApi =
     open Categorize
 
     let getVersions = 
-        Memoization.memoize Doses.getVersions
+        Memoization.memoize DoseRecords.getVersions
 
     let getDoses =
-        Memoization.memoize Doses.getDoses
+        Memoization.memoize DoseRecords.getDoses
 
     let getProducts =
-        Memoization.memoize Doses.getProducts
+        Memoization.memoize DoseRecords.getProducts
 
     let getCategorizedAsString conn =
         fun generic ->
@@ -111,11 +111,39 @@ module ServerApi =
         |> List.distinct
 
 
+    let getFrequencies connString =
+        connString
+        |> DoseRecords.getDoses
+        |> List.collect (fun d -> d.Freqs)
+        |> List.distinct
+        |> List.sortBy (fun f ->
+            let time =
+                match f.Time with
+                | (x, u) when u = "dag" -> 0, x
+                | (x, u) when u = "dagen" -> 1, x
+                | (x, u) when u = "uur" -> 2, x
+                | (x, u) when u = "week" -> 3, x
+                | (x, u) when u = "weken" -> 4, x
+                | (x, u) when u = "maand" -> 5, x
+                | (x, u) when u = "maanden" -> 6, x
+                | _ -> 99, 0
+            time, f.Count
+        )
+        |> List.map (fun f ->
+            if f.Time |> fst = 1 then f.Time |> snd
+            else
+                f.Time
+                |> snd
+                |> sprintf "%i %s" (f.Time |> fst)            
+            |> sprintf "%i x / %s" f.Count
+        )
+
+
     let getPatients connString generic indication route =
         getDoses connString
         |> List.filter (fun d -> d.Generic = generic && d.Indication = indication && d.Route = route)
-        |> List.sortBy Doses.sortPat
-        |> List.map (fun d -> d |> Doses.printPat, d)
+        |> List.sortBy DoseRecords.sortPat
+        |> List.map (fun d -> d |> DoseRecords.printPat, d)
         |> List.map fst
         |> List.distinct
 
@@ -130,7 +158,7 @@ module ServerApi =
                 d.Indication |> String.equalsCapInsens i &&
                 d.Route |> String.equalsCapInsens r
             )
-            |> List.map (fun d -> d |> Doses.printPat, d)
+            |> List.map (fun d -> d |> DoseRecords.printPat, d)
             |> List.filter (fst >> ((=) p))
             |> List.map snd
         | Some g, Some i, Some r, None ->
@@ -152,7 +180,7 @@ module ServerApi =
                 d.Generic = g
             )
         | None, _, _, _ -> []
-        |> Doses.toMarkdown
+        |> DoseRecords.toMarkdown
 
 
     /// An implementation of the Shared IServerApi protocol.
@@ -231,7 +259,7 @@ module ServerApi =
             }
 
 
-        member this.GetMarkdown (qry : Shared.Types.Query) =
+        member this.GetMarkdown (qry : Shared.Types.QueryTypes.Query) =
             async {
                 try
                     let markdown = getMarkdown connString qry.Generic qry.Indication qry.Route qry.Patient
@@ -270,6 +298,17 @@ module ServerApi =
                         return Error error.Message
             }
 
+        member this.GetFrequencies _ =
+            async {
+                try
+                    let freqs = getFrequencies connString
+                    return Ok freqs
+                with
+                | error ->
+                    logger.LogError(error, "Error retrieving frequencies")
+                    return Error error.Message
+            }
+
         member this.Build() : IServerApi =
             {
                 GetVersions = this.GetVersions
@@ -281,5 +320,6 @@ module ServerApi =
                 GetMarkdown = this.GetMarkdown
                 GetCategorized = this.GetCategorized
                 GetCategorizedAsString = this.GetCategorizedAsString
+                GetFrequencies = this.GetFrequencies
             }
 

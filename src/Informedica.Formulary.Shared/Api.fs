@@ -5,7 +5,8 @@ open System
 
 module Api =
 
-    open Types
+    open Types.QueryTypes
+    open Types.DoseTypes
 //    open Categorize
 
     /// Defines how routes are generated on server and mapped from client
@@ -21,4 +22,5 @@ module Api =
         GetMarkdown : Query -> Async<Result<string, string>>
         GetCategorized : string -> Async<Result<CategorizedGeneric list, string>>
         GetCategorizedAsString : string -> Async<Result<string list, string>>
+        GetFrequencies : unit -> Async<Result<string list, string>>
     }

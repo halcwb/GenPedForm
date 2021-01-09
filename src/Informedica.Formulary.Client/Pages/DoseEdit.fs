@@ -14,7 +14,7 @@ module DoseEdit =
      open Feliz.Markdown
  
     open System
-    open Informedica.Formulary.Shared.Types
+    open Informedica.Formulary.Shared.Types.DoseTypes
     open Informedica.Formulary.Client
     open Informedica.Formulary.Client.Components
 
@@ -23,7 +23,7 @@ module DoseEdit =
         { 
             Selected : string option
             Generics : CategorizedGeneric list
-            DoseDetails : string option
+            DoseDetails : DoseSchema option
         }
 
     
@@ -115,39 +115,37 @@ module DoseEdit =
                 DoseDetails =
                     state.Generics 
                     |> findTreeItem s 
-                    |> function
-                    | Some d -> 
-                        d 
-                        |> Utils.printDose 
-                        |> Some
-                    | None   -> None
 
             }, 
             Cmd.none
 
 
-    let createItem 
-        dispatch 
-        hasDose
-        variant 
-        id 
-        (labelText : string) 
-        (children : ReactElement seq) =
+    let createItem dispatch hasDose variant id (labelText : string)  (children : ReactElement seq) =
         
         let labelDiv = 
             Html.div [
                 prop.style [
                     style.display.flex
                     style.alignItems.center
+                    style.padding 2
                 ]
                 prop.children [
-                    if hasDose then 
-                        editIcon []
+                    if variant = typography.variant.body1 then
+                        editIcon [ 
+                            prop.style [ 
+                                if not hasDose then style.color.white
+                                style.marginRight 5 
+                            ] 
+                        ]
+
                     Mui.typography [
                         prop.style [
                             if variant = typography.variant.h5 ||
-                               variant = typography.variant.h6 then
+                                variant = typography.variant.h6 then
                                 style.color Colors.indigo.``900`` 
+                            else 
+                                style.fontWeight.bold
+                                style.color Colors.grey.``700``
                         ]
                         variant
                         prop.text labelText
@@ -184,7 +182,7 @@ module DoseEdit =
 
     let categoryToTreeItems dispatch id (Category(c, doc)) =
         let createItem b = createItem dispatch b typography.variant.body1 
-        let toString = Utils.patientToStr
+        let toString =  Utils.patientToStr
 
         let rec toItems id i (Category(c, doc)) =
             let id = sprintf "%s.%i" id i
@@ -214,8 +212,112 @@ module DoseEdit =
         | _ -> []
 
 
+    let renderDose dispatch freqs (d: DoseSchema) =
+        let getSubstanceDose d =
+            d
+            |> List.head
+            |> fun d -> 
+                d.SubstanceDoses
+                |> List.head
+
+        let createCheckBox (l : string) =
+            Mui.formControlLabel [
+                formControlLabel.label l
+                formControlLabel.control (Mui.checkbox [])
+            ]
+
+        let render l u v = 
+            Mui.formControl [
+                prop.style [ style.paddingBottom 5 ]
+                formControl.children [
+                    Components.NumberInput.render l u v dispatch
+                ]
+            ]
+        
+        let qtyToStrU qty =
+            match qty with
+            | Some q -> 
+                match q with
+                | Quantity v      -> "",   v |> Some
+                | QuantityPerM2 v -> "m2", v |> Some
+                | QuantityPerKg v -> "kg", v |> Some
+            | None -> "", None
+
+        let u = 
+            d
+            |> getSubstanceDose
+            |> fun sd -> sd.NormDose
+            |> qtyToStrU
+            |> fst
+            |> fun s -> 
+                let u = 
+                    d 
+                    |> getSubstanceDose 
+                    |> fun sd -> sd.Unit
+
+                if s = "" then u
+                else
+                    s
+                    |> sprintf "%s/%s" u
+
+        Html.div [
+            prop.style [
+                style.display.flex
+                style.flexDirection.column
+//                style.padding 10
+            ]
+            prop.children [
+                Mui.typography [
+                    prop.style [
+                        style.color Colors.indigo.``900``
+                    ]
+                    typography.variant.h5
+                    prop.text "dosering" 
+                ]
+
+                Mui.formControl [
+                    prop.style [ 
+                        style.paddingTop 10 
+                        style.paddingBottom 10
+                    ]
+                    formControl.children [
+                        {|
+                            value = 
+                                d 
+                                |> List.head
+                                |> fun d -> d.Frequencies
+                                |> List.map (fun f ->
+                                    if f.Time |> fst = 1 then f.Time |> snd
+                                    else
+                                        f.Time
+                                        |> snd
+                                        |> sprintf "%i %s" (f.Time |> fst)            
+                                    |> sprintf "%i x / %s" f.Count
+                                )
+                            items = freqs  
+                            label = "Frequenties"
+                            dispatch = ignore
+                        |}
+                        |> Components.MultiSelect.render
+                    ]
+                ]
+
+                let d = d |> getSubstanceDose
+                render "Norm Dose" u (d.NormDose |> qtyToStrU |> snd)
+                render "Min Dose" u (d.MinDose |> qtyToStrU |> snd)
+                render "Max Dose" u (d.MaxDose |> qtyToStrU |> snd)
+                render "Min Duur" "dagen" None
+                render "Max Duur" "dagen" None
+                render "Abs Max Dose" d.Unit (d.AbsMaxDose |> qtyToStrU |> snd)
+                render "Max Keer Dose" d.Unit (d.MaxPerDose |> qtyToStrU |> snd)
+//                render "Start Dose" u (d.StartDose |> qtyToStrU |> snd)
+                render "Duur" "keer" None
+            ]
+        ]
+
+
     let private comp =
-        React.functionComponent("dosedit", fun (props: {| generics: CategorizedGeneric list |}) ->
+        React.functionComponent("dosedit", fun (props: {| generics: CategorizedGeneric list; Frequencies : string list |}) ->
             let state, dispatch = React.useElmish ((init props.generics), update, [||])
             
             let createItem = createItem dispatch false
@@ -266,11 +368,14 @@ module DoseEdit =
 
                         prop.children [
                             state.DoseDetails 
-                            |> Option.defaultValue ""
-                            |> markdown.source
-                            |> List.singleton
-                            |> List.append [ markdown.escapeHtml false ]
-                            |> Markdown.markdown
+                            |> function
+                            | Some d -> 
+                                //d
+                                //|> sprintf "%A"
+                                //|> printfn "current dose: %s"
+                                d 
+                                |> renderDose ignore props.Frequencies
+                            | None -> Html.div []
 
                         ]
                     ]
@@ -279,4 +384,4 @@ module DoseEdit =
         )
 
 
-    let render gs = comp({| generics = gs |})
+    let render (gs, freqs) = comp({| generics = gs; Frequencies = freqs |})

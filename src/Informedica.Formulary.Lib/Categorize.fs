@@ -60,11 +60,11 @@ module Categorize =
         match pc with
         | RootCategory -> ""
         | Gender g -> g |> genderToStr
-        | GestationAge mm -> mm |> minMaxToStr (int >> Doses.printDays) |> sprintf "zwangerschapsduur: %s weken"
-        | PostConceptionalAge mm -> mm |> minMaxToStr (int >> Doses.printDays) |> sprintf "post Conceptie Leeftijd: %s"
+        | GestationAge mm -> mm |> minMaxToStr (int >> DoseRecords.printDays) |> sprintf "zwangerschapsduur: %s weken"
+        | PostConceptionalAge mm -> mm |> minMaxToStr (int >> DoseRecords.printDays) |> sprintf "post Conceptie Leeftijd: %s"
         | Weight mm -> mm |> minMaxToStr toStr |> sprintf "gewicht: %s kg"
         | BodySurfaceArea mm -> mm |> minMaxToStr toStr |> sprintf "lichaamsoppervlak: %s m2"
-        | Age mm -> mm |> minMaxToStr Doses.printAge |> sprintf "leeftijd: %s"
+        | Age mm -> mm |> minMaxToStr DoseRecords.printAge |> sprintf "leeftijd: %s"
 
 
     let toString indent (Category(_, cod)) =
@@ -72,7 +72,7 @@ module Categorize =
             match cod with
             | Dose d ->
                 match d with
-                | Some d -> d |> Doses.printDose
+                | Some d -> d |> DoseSchema.print
                 | None   -> "geen dosering\n"
                 |> String.replace "*" ""
                 |> sprintf "%s: %s" s
@@ -400,7 +400,7 @@ module Categorize =
         ) []
     
 
-    let mapDosesToCat (ds: Types.Dose list) =
+    let mapDosesToCat (ds: Types.DoseRecord list) =
         let mapMinMax min max =
             match min, max with
             | None, None         -> minMax
@@ -408,9 +408,9 @@ module Categorize =
             | Some min, None -> minMax |> setMinIncl min
             | None, Some max -> minMax |> setMaxExcl max
 
-        let mapDoses fMinMax fpc mapper (ds : Types.Dose list) : CategoriesOrDose =
+        let mapDoses fMinMax fpc mapper (ds : Types.DoseRecord list) : CategoriesOrDose =
             ds
-            |> List.sortBy Doses.sortPat
+            |> List.sortBy DoseRecords.sortPat
             |> List.forall (fMinMax >> (fun (min, max) -> min |> Option.isNone && max |> Option.isNone))
             |> function 
             | true -> 
@@ -418,7 +418,7 @@ module Categorize =
                 |> mapper
             | false ->
                 ds
-                |> List.sortBy Doses.sortPat
+                |> List.sortBy DoseRecords.sortPat
                 |> List.groupBy fMinMax
                 |> List.map (fun ((min, max), ds) ->
                     mapMinMax min max
@@ -428,60 +428,62 @@ module Categorize =
                 |> evalCategories
                 |> Categories
 
-        let mapWeight (ds : Types.Dose list) =
-            let fMinMax (d: Types.Dose) =
+        let mapWeight (ds : Types.DoseRecord list) =
+            let fMinMax (d: Types.DoseRecord) =
                 d.MinWeightKg,
                 d.MaxWeightKg
         
-            let mapper (ds: Types.Dose list) =
+            let mapper (ds: Types.DoseRecord list) =
                 match ds with
                 | [d] -> 
-                    { d with Products = [] } |> Some |> Dose
+                    [ d ] |> DoseSchema.mapToSchema |> Some |> Dose
                 | _   -> None |> Dose
 
             ds
             |> mapDoses fMinMax Weight mapper
 
-        let mapGestAge (ds : Types.Dose list) =
-            let fMinMax (d: Types.Dose) =
-                d.MinGestAgeDays |> Option.map float, 
-                d.MaxGestAgeDays |> Option.map float
-            ds
-            |> mapDoses fMinMax GestationAge mapWeight
 
-
-        let mapAge (ds : Types.Dose list) =
-            let fMinMax (d: Types.Dose) =
+        let mapAge (ds : Types.DoseRecord list) =
+            let fMinMax (d: Types.DoseRecord) =
                 d.MinAgeMo,
                 d.MaxAgeMo
             ds
-            |> mapDoses fMinMax Age mapGestAge 
+            |> mapDoses fMinMax Age mapWeight 
 
-        let mapPostAge (ds : Types.Dose list) =
-            let fMinMax (d: Types.Dose) =
+        let mapPostAge (ds : Types.DoseRecord list) =
+            let fMinMax (d: Types.DoseRecord) =
                 d.MinPMAgeDays |> Option.map float, 
                 d.MaxPMAgeDays |> Option.map float
             ds
             |> mapDoses fMinMax PostConceptionalAge mapAge
+
+
+        let mapGestAge (ds : Types.DoseRecord list) =
+            let fMinMax (d: Types.DoseRecord) =
+                d.MinGestAgeDays |> Option.map float, 
+                d.MaxGestAgeDays |> Option.map float
+            ds
+            |> mapDoses fMinMax GestationAge mapPostAge
+
     
         ds
         |> List.groupBy (fun d -> d.Gender)
         |> function
         | [g] -> 
-            Category(RootCategory, g |> snd |> mapPostAge)
+            Category(RootCategory, g |> snd |> mapGestAge)
         | [g1; g2] ->
             match g1 |> fst, g2 |> fst with
             | Types.Male, Types.Female ->
                 [
-                    Category(MaleGender   |> Gender, g1 |> snd |> mapPostAge)
-                    Category(FemaleGender |> Gender, g2 |> snd |> mapPostAge)
+                    Category(MaleGender   |> Gender, g1 |> snd |> mapGestAge)
+                    Category(FemaleGender |> Gender, g2 |> snd |> mapGestAge)
                 ]
                 |> Categories
                 |> fun cod -> Category(RootCategory, cod)
             | Types.Female, Types.Male ->
                 [
-                    Category(FemaleGender |> Gender, g1 |> snd |> mapPostAge)
-                    Category(MaleGender   |> Gender, g2 |> snd |> mapPostAge)
+                    Category(FemaleGender |> Gender, g1 |> snd |> mapGestAge)
+                    Category(MaleGender   |> Gender, g2 |> snd |> mapGestAge)
                 ]
                 |> Categories
                 |> fun cod -> Category(RootCategory, cod)
@@ -492,7 +494,7 @@ module Categorize =
 
 
 
-    let mapDoses (ds: Types.Dose list) =
+    let mapDoses (ds: Types.DoseRecord list) =
         ds
         |> List.groupBy (fun d -> d.Generic)
         |> List.map (fun (g, ds) ->

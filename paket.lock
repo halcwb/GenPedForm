@@ -364,7 +364,7 @@ NUGET
     Feliz.Markdown (1.3)
       Feliz (>= 1.17)
       FSharp.Core (>= 4.7.2)
-    Feliz.MaterialUI (1.2.3)
+    Feliz.MaterialUI (1.2.4)
       Feliz (>= 1.5)
       FSharp.Core (>= 4.7)
     Feliz.MaterialUI.Pickers (1.1.2)

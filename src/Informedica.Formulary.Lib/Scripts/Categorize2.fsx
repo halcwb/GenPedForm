@@ -7,7 +7,8 @@
 
 #load "../Utils.fs"
 #load "../Types.fs"
-#load "../Doses.fs"
+#load "../DoseRecords.fs"
+#load "../DoseSchema.fs"
 #load "../Categorize.fs"
 
 open System
@@ -76,9 +77,9 @@ initCategory
 |> function 
 | true, s ->
     printfn "=== Start ==="
-    Doses.getDoses s
+    DoseRecords.getDoses s
 //    |> List.take 500
-    |> List.filter (fun d -> d.Generic = "paracetamol" && d.Route = "iv")
+    |> List.filter (fun d -> d.Generic = "paracetamol" && d.Route = "rect")
     |> mapDoses
     |> List.take 1
     |> List.iter (fun d ->
@@ -135,7 +136,7 @@ initCategory
 |> getPatientDoses
 
 
-let mapCategorizedGeneric (g: CategorizedGeneric) =
+let mapToDoseRecords generic shape route indication pcs ds = 
     let getMin = Option.bind (getMinValue >> Some)
     let getMax = Option.bind (getMaxValue >> Some)
 
@@ -146,6 +147,117 @@ let mapCategorizedGeneric (g: CategorizedGeneric) =
             else pc |> f
         ) None 
 
+    let dr =
+        {
+            DoseRecords.dose with
+                Generic = generic
+                Shape = shape
+                Route = route
+                Indication = indication
+                Gender = 
+                    pcs
+                    |> List.fold (fun acc pc ->
+                        if acc = (Types.Unknown "") then
+                            match pc with
+                            | Gender(MaleGender)   -> Types.Male
+                            | Gender(FemaleGender) -> Types.Male
+                            | _ -> acc
+                        else acc
+                    ) (Types.Unknown "")
+                MinAgeMo = 
+                    fun pc ->
+                        match pc with
+                        | Age mm -> mm.Min |> getMin
+                        | _ -> None
+                    |> get pcs
+                MaxAgeMo = 
+                    fun pc ->
+                        match pc with
+                        | Age mm -> mm.Max |> getMax
+                        | _ -> None
+                    |> get pcs
+                MinGestAgeDays = 
+                    fun pc ->
+                        match pc with
+                        | GestationAge mm -> mm.Min |> getMin |> Option.map int
+                        | _ -> None
+                    |> get pcs
+                MaxGestAgeDays = 
+                    fun pc ->
+                        match pc with
+                        | GestationAge mm -> mm.Max |> getMax |> Option.map int
+                        | _ -> None
+                    |> get pcs
+                MinPMAgeDays = 
+                    fun pc ->
+                        match pc with
+                        | PostConceptionalAge mm -> mm.Min |> getMin |> Option.map int
+                        | _ -> None
+                    |> get pcs
+                MaxPMAgeDays = 
+                    fun pc ->
+                        match pc with
+                        | PostConceptionalAge mm -> mm.Max |> getMax |> Option.map int
+                        | _ -> None
+                    |> get pcs
+                MinWeightKg = 
+                    fun pc ->
+                        match pc with
+                        | Weight mm -> mm.Min |> getMin 
+                        | _ -> None
+                    |> get pcs
+                MaxWeightKg = 
+                    fun pc ->
+                        match pc with
+                        | Weight mm -> mm.Max |> getMax
+                        | _ -> None
+                    |> get pcs
+
+        }
+
+    match ds with
+    | None -> [ dr ]
+    | Some ds -> 
+        ds
+        |> List.map (fun di ->
+            {
+                dr with
+                    Freqs = di.Frequencies
+                    //Unit = 
+                    //    match sd with
+                    //    | Some d -> d.Unit
+                    //    | None   -> ""
+                    //NormDose =
+                    //    match sd with
+                    //    | Some d -> d.NormDose
+                    //    | None   -> None
+                    //MinDose =
+                    //    match sd with
+                    //    | Some d -> d.MinDose
+                    //    | None   -> None
+                    //MaxDose =
+                    //    match sd with
+                    //    | Some d -> d.MaxDose
+                    //    | None   -> None
+                    //AbsMaxDose =
+                    //    match sd with
+                    //    | Some d -> d.AbsMaxDose
+                    //    | None   -> None
+                    //MaxPerDose =
+                    //    match sd with
+                    //    | Some d -> d.MaxPerDose
+                    //    | None   -> None
+                    //Products =
+                    //    match sd with
+                    //    | Some d -> d.Products
+                    //    | None   -> []
+            }
+        )
+
+
+
+let mapCategorizedGeneric (g: CategorizedGeneric) =
+
     g.Shapes
     |> List.collect(fun s ->
         s.Routes
@@ -154,108 +266,14 @@ let mapCategorizedGeneric (g: CategorizedGeneric) =
             |> List.collect (fun i ->
                 i.Patient
                 |> getPatientDoses 
-                |> List.map (fun (sd, pcs) ->
-                    {
-                        Doses.dose with
-                            Generic = g.Generic
-                            Shape = s.Shape
-                            Route = r.Route
-                            Indication = i.Indication
-                            Gender = 
-                                pcs
-                                |> List.fold (fun acc pc ->
-                                    if acc = (Types.Unknown "") then
-                                        match pc with
-                                        | Gender(MaleGender) -> Types.Male
-                                        | Gender(FemaleGender) -> Types.Male
-                                        | _ -> acc
-                                    else acc
-                                ) (Types.Unknown "")
-                            MinAgeMo = 
-                                fun pc ->
-                                    match pc with
-                                    | Age mm -> mm.Min |> getMin
-                                    | _ -> None
-                                |> get pcs
-                            MaxAgeMo = 
-                                fun pc ->
-                                    match pc with
-                                    | Age mm -> mm.Max |> getMax
-                                    | _ -> None
-                                |> get pcs
-                            MinGestAgeDays = 
-                                fun pc ->
-                                    match pc with
-                                    | GestationAge mm -> mm.Min |> getMin |> Option.map int
-                                    | _ -> None
-                                |> get pcs
-                            MaxGestAgeDays = 
-                                fun pc ->
-                                    match pc with
-                                    | GestationAge mm -> mm.Max |> getMax |> Option.map int
-                                    | _ -> None
-                                |> get pcs
-                            MinPMAgeDays = 
-                                fun pc ->
-                                    match pc with
-                                    | PostConceptionalAge mm -> mm.Min |> getMin |> Option.map int
-                                    | _ -> None
-                                |> get pcs
-                            MaxPMAgeDays = 
-                                fun pc ->
-                                    match pc with
-                                    | PostConceptionalAge mm -> mm.Max |> getMax |> Option.map int
-                                    | _ -> None
-                                |> get pcs
-                            MinWeightKg = 
-                                fun pc ->
-                                    match pc with
-                                    | Weight mm -> mm.Min |> getMin 
-                                    | _ -> None
-                                |> get pcs
-                            MaxWeightKg = 
-                                fun pc ->
-                                    match pc with
-                                    | Weight mm -> mm.Max |> getMax
-                                    | _ -> None
-                                |> get pcs
-                            Freqs = 
-                                match sd with
-                                | Some d -> d.Freqs
-                                | None   -> []
-                            Unit = 
-                                match sd with
-                                | Some d -> d.Unit
-                                | None   -> ""
-                            NormDose =
-                                match sd with
-                                | Some d -> d.NormDose
-                                | None   -> None
-                            MinDose =
-                                match sd with
-                                | Some d -> d.MinDose
-                                | None   -> None
-                            MaxDose =
-                                match sd with
-                                | Some d -> d.MaxDose
-                                | None   -> None
-                            AbsMaxDose =
-                                match sd with
-                                | Some d -> d.AbsMaxDose
-                                | None   -> None
-                            MaxPerDose =
-                                match sd with
-                                | Some d -> d.MaxPerDose
-                                | None   -> None
-                            StartDose =
-                                match sd with
-                                | Some d -> d.StartDose
-                                | None   -> None
-                            Products =
-                                match sd with
-                                | Some d -> d.Products
-                                | None   -> []
-                    }
+                |> List.collect (fun (ds, pcs) ->
+                    mapToDoseRecords 
+                        g.Generic
+                        s.Shape
+                        r.Route
+                        i.Indication
+                        pcs
+                        ds
                 )
             )
         )
@@ -267,7 +285,7 @@ let mapCategorizedGeneric (g: CategorizedGeneric) =
 |> function 
 | true, s ->
     printfn "=== Start ==="
-    Doses.getDoses s
+    DoseRecords.getDoses s
 //    |> List.take 500
 //    |> List.filter (fun d -> d.Generic = "paracetamol") //&& d.Route = "iv")
     |> mapDoses

@@ -13,7 +13,7 @@ module Types =
     type Frequency = { Count : Count; Time : TimeUnit }
     type Gender = Male | Female | Unknown of string
 
-    type Dose =
+    type DoseRecord =
         {
             Generic : string
             Shape : string
@@ -29,17 +29,18 @@ module Types =
             MaxGestAgeDays : int option
             MinPMAgeDays : int option
             MaxPMAgeDays : int option
+            Name : string
             Freqs : Frequency list
+            MinDuration : TimeUnit option
+            MaxDuration : TimeUnit option
             Unit : Unit
             NormDose : DoseQuantity option
             MinDose : DoseQuantity option
             MaxDose : DoseQuantity option
             AbsMaxDose : DoseQuantity option
             MaxPerDose : DoseQuantity option
-            StartDose : DoseQuantity option
             Products : Product list
         }
-
     and Product =
         {
             GPK : int
@@ -57,7 +58,7 @@ module Types =
             MultipleUnit : string
             HasSolution : bool
             IsInStock : bool
-            Doses : Dose list
+            Doses : DoseRecord list
         }
 
 
@@ -88,9 +89,32 @@ module Types =
         | BodySurfaceArea of BodySurfaceAreaCategory
 
 
+    type DoseSchema = DoseItem list
+    and DoseItem =
+        {
+            Name : string
+            Frequencies : Frequency list
+            MinDuration : TimeUnit option
+            MaxDuration : TimeUnit option
+            SubstanceDoses : SubstanceDose list
+        }
+    and SubstanceDose =
+        {
+            Substance : string
+            Unit : Unit
+            NormDose : DoseQuantity option
+            MinDose : DoseQuantity option
+            MaxDose : DoseQuantity option
+            MinDoseRate : DoseQuantity option
+            MaxDoseRate : DoseQuantity option
+            AbsMaxDose : DoseQuantity option
+            MaxPerDose : DoseQuantity option
+        }
+
+
     type Category =
         | Category of PatientCategory * CategoriesOrDose
-    and CategoriesOrDose = Categories of Category list | Dose of Dose option
+    and CategoriesOrDose = Categories of Category list | Dose of DoseSchema option
     
     
     type CategorizedGeneric =

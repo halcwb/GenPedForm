@@ -1,7 +1,0 @@
-Informedica.GenUtils.Lib
-FSharp.Core
-
-group Library
-    FSharp.Data
-    Microsoft.Data.SqlClient
-    DustyTables

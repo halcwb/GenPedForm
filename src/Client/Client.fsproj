@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <DefineConstants>FABLE_COMPILER</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="index.html" />
+    <Compile Include="../Shared/Shared.fs" />
+    <Compile Include="Extensions.fs" />
+    <Compile Include="Utils.fs" />
+    <Compile Include="Bindings.fs" />
+    <Compile Include="Server.fs" />
+    <Compile Include="Components\NumberInput.fs" />
+    <Compile Include="Components\MultiSelect.fs" />
+    <Compile Include="Components\Autocomplete.fs" />
+    <Compile Include="Components\TitleBar.fs" />
+    <Compile Include="App.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Shared\Shared.fsproj" />
+  </ItemGroup>
+  <Import Project="..\..\.paket\Paket.Restore.targets" />
+</Project>

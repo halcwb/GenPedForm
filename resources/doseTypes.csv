@@ -1,2 +1,0 @@
-﻿Generic,Vorm,Route,Indicatie,Afdeling,Geslacht,MinLeeftijdMnd,MaxLeeftijdMnd,MinGewichtKg,MaxGewichtKg,MinGestDagen,MaxGestDagen,MinPMDagen,MaxPMDagen,Frequenties,Eenheid,NormDose,MinDose,MaxDose,AbsMaxDose,MaxPerDose,DosePerKg,DosePerM2
-abacavir,drank,or,hiv,pediatrie,man,1,12,10,15,234,340,234,340,1 x /week,mg,0.1,0.1,0.1,1.2,1.3,x,x

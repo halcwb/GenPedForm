@@ -10,11 +10,12 @@ open Feliz.MaterialUI
 
 open Shared
 
+
+type Filter = Components.Autocomplete.Filter
+
+
 type State =
     { 
-        SelectedGeneric: string option
-        SelectedIndication: string option
-        SelectedRoute: string option
         SelectedPatient: string option
         Query: Deferred<Query>
     }
@@ -23,25 +24,23 @@ type State =
 type Msg =
     | RunQuery of AsyncOperationStatus<Result<Query, string>>
     | SelectGeneric of string
-    (*
     | SelectIndication of string
     | SelectRoute of string
+    (*
     | SelectPatient of string
     *)
 
 
 let initialState =
     { 
-        SelectedGeneric = None
-        SelectedIndication = None
-        SelectedRoute = None
         SelectedPatient = None
         Query = HasNotStartedYet
     }
 
 
-let query = function
+let queryCmd = function
     | Resolved qry ->
+        printfn $"cmd: {qry.Filter.Generic}"
         async {
             let! result = Server.api.Query qry
             return RunQuery(Finished result)
@@ -59,10 +58,18 @@ let query = function
 
 
 let init(): State * Cmd<Msg> =
-    initialState, initialState.Query |> query
+    initialState, initialState.Query |> queryCmd
 
 
 let update (msg: Msg) (state: State): State * Cmd<Msg> =
+    let select s set = 
+        let state =
+            if s = "" then initialState
+            else
+                set state s
+
+        state, state.Query |> queryCmd
+
     match msg with
     | RunQuery Started -> state, Cmd.none
 
@@ -73,54 +80,92 @@ let update (msg: Msg) (state: State): State * Cmd<Msg> =
         printfn "error %s" e
         state, Cmd.none
 
-    | SelectGeneric generic ->
-        if generic <> "" then
+    | SelectGeneric s ->
+        printfn $"selected: {s}"
+        fun (state : State) s ->
             { state with
-                    SelectedGeneric = Some generic
-                    SelectedIndication = None
-                    SelectedRoute = None
-                    SelectedPatient = None
-                    Query = state.Query |> Deferred.map (fun q -> { q with Generics = [| generic |]})
-            }, 
-            state.Query |> query
-            
-        else
-            initialState, 
-            state.Query |> query
+                Query = 
+                    state.Query 
+                    |> Deferred.map (fun q -> 
+                        { q with 
+                            Filter = 
+                                { q.Filter with
+                                    Generic = Some s
+                                }
+                        }
+                    )
+            }
+        |> select s
+
+    | SelectIndication s ->
+        fun (state : State)  s ->
+            { state with
+                Query = 
+                    state.Query 
+                    |> Deferred.map (fun q -> 
+                        { q with 
+                            Filter = 
+                                { q.Filter with
+                                    Indication = Some s
+                                }
+                        }
+                    )
+            }
+        |> select s
+
+    | SelectRoute s ->
+        fun (state : State)  s ->
+            { state with
+                Query = 
+                    state.Query 
+                    |> Deferred.map (fun q -> 
+                        { q with 
+                            Filter = 
+                                { q.Filter with
+                                    Route = Some s
+                                }
+                        }
+                    )
+            }
+        |> select s
 
 
-
-
-let createFilter generics dispatch =
+let createFilter generics indications routes dispatch =
+    let toDiv el =
+        Html.div [
+            prop.style [ style.marginTop 20 ]
+            prop.children [ el ]
+        ]
     [ 
         { Components.Autocomplete.props with
-            Dispatch = (SelectGeneric >> dispatch)
+            Dispatch = SelectGeneric >> dispatch
             Options = generics |> Array.toList
             Label = sprintf "Zoek een generiek (van %i totaal)" (generics |> Array.length)
-            Filter = Components.Autocomplete.Filter.StartsWith 
+            Filter = Filter.StartsWith 
         }
         |> Components.Autocomplete.render
+        |> toDiv
+
+        
+        { Components.Autocomplete.props with
+            Dispatch = SelectIndication >> dispatch
+            Options = indications |> Array.toList
+            Label = sprintf "Kies een indicatie (van %i totaal)" (indications |> Array.length)
+            Filter = Filter.ContainsCaseSensitive 
+        }
+        |> Components.Autocomplete.render 
+        |> toDiv
+
+        { Components.Autocomplete.props with
+                Dispatch = SelectRoute >> dispatch
+                Options = routes |> Array.toList
+                Label = sprintf "Kies een route (van %i totaal)" (routes |> Array.length)
+                Filter = Filter.StartsWith
+        }
+        |> Components.Autocomplete.render 
+        |> toDiv
 
         (*
-        match indications with
-        | Resolved indications ->
-            Html.div [ 
-                prop.style [ 
-                    style.marginTop 20 
-                ]
-                prop.children [ 
-                    { Components.Autocomplete.props with
-                        Dispatch = SelectIndication >> dispatch
-                        Options = indications |> List.sort
-                        Label = sprintf "Kies een indicatie (van %i totaal)" (indications |> List.length)
-                        Filter = Filter.ContainsCaseSensitive 
-                    }
-                    |> Components.Autocomplete.render 
-                ] 
-            ]
-
-        | _ -> ()
-
         match routes with
         | Resolved routes ->
             Html.div [ 
@@ -156,8 +201,9 @@ let createFilter generics dispatch =
 
 let render (state: State) (dispatch: Msg -> unit) =
     let toMarkDown s = 
+        printfn $"to markdown: {s}"
         s
-        |> markdown.source
+        |> markdown.children
         |> List.singleton
         |> List.append [ markdown.escapeHtml false ]
         |> Markdown.markdown
@@ -172,7 +218,11 @@ let render (state: State) (dispatch: Msg -> unit) =
         | InProgress  -> "## Formularium wordt geladen" |> toMarkDown
         | Resolved qry ->
             let filter = 
-                createFilter qry.Generics dispatch
+                createFilter 
+                    qry.Generics 
+                    qry.Indications 
+                    qry.Routes
+                    dispatch
 
             Html.div [
                 // search
@@ -186,6 +236,7 @@ let render (state: State) (dispatch: Msg -> unit) =
                         style.padding 10
                         style.color Colors.indigo.``900`` 
                     ]
+
                     qry.Markdown
                     |> Array.toList
                     |> List.map toMarkDown

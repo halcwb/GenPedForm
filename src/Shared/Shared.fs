@@ -36,9 +36,8 @@ module Types =
             Shapes : string []
             Routes : string []
             Departments : string []
-            Diagnoses : string []
-            Genders : string []
             Patients : string []
+            Diagnoses : string []
             Markdown : string []
         }
 
@@ -85,7 +84,6 @@ module Query =
             Routes = Array.empty
             Departments = Array.empty
             Diagnoses = Array.empty
-            Genders = Array.empty
             Patients = Array.empty
             Markdown = Array.empty
         }

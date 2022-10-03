@@ -65,6 +65,7 @@ module Autocomplete =
         sl
         |> List.map (fun s -> {| label = s |} |> Some)
         |> List.toArray
+        |> Array.sort
 
     let applyToOption def f (o: {| label: string |} option) =
         match o with

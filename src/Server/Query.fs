@@ -11,6 +11,7 @@ open Informedica.Utils.Lib
 type DoseRule = Informedica.GenForm.Lib.Types.DoseRule
 type GenFormFilter = Informedica.GenForm.Lib.Types.Filter
 
+module Patient = Informedica.GenForm.Lib.Patient
 module DoseRule = Informedica.GenForm.Lib.DoseRule
 
 
@@ -49,6 +50,7 @@ let run (qry : Query)  =
                 Generics = rs |> DoseRule.generics
                 Shapes = rs |> DoseRule.shapes
                 Routes = rs |> DoseRule.routes
+                Patients = rs |> Array.map (fun dr -> dr.Patient |> Patient.toString) 
                 Markdown = rs |> DoseRule.printGenerics
             }
         |> Ok

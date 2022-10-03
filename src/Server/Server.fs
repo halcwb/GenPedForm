@@ -14,12 +14,21 @@ module ServerApi =
 
     let runQuery = 
         fun qry ->
-            printfn "running qry"
+            [
+                qry.Filter.Indication
+                qry.Filter.Generic
+                qry.Filter.Shape
+                qry.Filter.Route
+                qry.Filter.Patient.Diagnosis
+            ]
+            |> List.choose id
+            |> String.concat ", "
+            |> printfn "running qry: %s"
+            
             async {
                 return 
                     qry
                     |> Query.run
-//                    |> Ok
             }
 
 

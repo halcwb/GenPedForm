@@ -16,7 +16,6 @@ type Filter = Components.Autocomplete.Filter
 
 type State =
     { 
-        SelectedPatient: string option
         Query: Deferred<Query>
     }
 
@@ -25,22 +24,21 @@ type Msg =
     | RunQuery of AsyncOperationStatus<Result<Query, string>>
     | SelectGeneric of string
     | SelectIndication of string
+    | SelectShape of string
     | SelectRoute of string
-    (*
     | SelectPatient of string
-    *)
+    | SelectDiagnosis of string
+    | Refresh
 
 
 let initialState =
     { 
-        SelectedPatient = None
         Query = HasNotStartedYet
     }
 
 
 let queryCmd = function
     | Resolved qry ->
-        printfn $"cmd: {qry.Filter.Generic}"
         async {
             let! result = Server.api.Query qry
             return RunQuery(Finished result)
@@ -64,11 +62,11 @@ let init(): State * Cmd<Msg> =
 let update (msg: Msg) (state: State): State * Cmd<Msg> =
     let select s set = 
         let state =
-            if s = "" then initialState
+            if s = "" then set state None
             else
-                set state s
+                set state (Some s)
 
-        state, state.Query |> queryCmd
+        { state with State.Query = InProgress }, state.Query |> queryCmd
 
     match msg with
     | RunQuery Started -> state, Cmd.none
@@ -80,8 +78,83 @@ let update (msg: Msg) (state: State): State * Cmd<Msg> =
         printfn "error %s" e
         state, Cmd.none
 
+    | Refresh -> 
+        let cmd =
+            state.Query
+            |> Deferred.map (fun qry ->
+                { qry with Refresh = true }
+            )
+            |> queryCmd
+
+        { state with Query = InProgress }, cmd
+
     | SelectGeneric s ->
-        printfn $"selected: {s}"
+        if s = "" then initialState, initialState.Query |> queryCmd
+        else
+            fun (state: State) gen ->
+                { state with
+                    Query = 
+                        state.Query 
+                        |> Deferred.map (fun q -> 
+                            { q with 
+                                Filter = 
+                                    { q.Filter with
+                                        Generic = gen
+                                    }
+                            }
+                        )
+                }
+            |> select s
+
+    | SelectIndication s ->
+        fun (state : State) ind ->
+            { state with
+                Query = 
+                    state.Query 
+                    |> Deferred.map (fun q -> 
+                        { q with 
+                            Filter = 
+                                { q.Filter with
+                                    Indication = ind
+                                }
+                        }
+                    )
+            }
+        |> select s
+
+    | SelectShape s ->
+        fun (state : State) shp ->
+            { state with
+                Query = 
+                    state.Query 
+                    |> Deferred.map (fun q -> 
+                        { q with 
+                            Filter = 
+                                { q.Filter with
+                                    Shape = shp
+                                }
+                        }
+                    )
+            }
+        |> select s
+
+    | SelectRoute s ->
+        fun (state : State) rte ->
+            { state with
+                Query = 
+                    state.Query 
+                    |> Deferred.map (fun q -> 
+                        { q with 
+                            Filter = 
+                                { q.Filter with
+                                    Route = rte
+                                }
+                        }
+                    )
+            }
+        |> select s
+
+    | SelectPatient pat ->
         fun (state : State) s ->
             { state with
                 Query = 
@@ -90,15 +163,15 @@ let update (msg: Msg) (state: State): State * Cmd<Msg> =
                         { q with 
                             Filter = 
                                 { q.Filter with
-                                    Generic = Some s
+                                    PatientString =  s
                                 }
                         }
                     )
             }
-        |> select s
+        |> select pat
 
-    | SelectIndication s ->
-        fun (state : State)  s ->
+    | SelectDiagnosis s ->
+        fun (state : State)  diagn ->
             { state with
                 Query = 
                     state.Query 
@@ -106,23 +179,10 @@ let update (msg: Msg) (state: State): State * Cmd<Msg> =
                         { q with 
                             Filter = 
                                 { q.Filter with
-                                    Indication = Some s
-                                }
-                        }
-                    )
-            }
-        |> select s
-
-    | SelectRoute s ->
-        fun (state : State)  s ->
-            { state with
-                Query = 
-                    state.Query 
-                    |> Deferred.map (fun q -> 
-                        { q with 
-                            Filter = 
-                                { q.Filter with
-                                    Route = Some s
+                                    Patient = 
+                                        { q.Filter.Patient with
+                                            Diagnosis = diagn
+                                        }
                                 }
                         }
                     )
@@ -130,7 +190,7 @@ let update (msg: Msg) (state: State): State * Cmd<Msg> =
         |> select s
 
 
-let createFilter generics indications routes dispatch =
+let createFilter generics indications shapes routes patients diagnoses dispatch =
     let toDiv el =
         Html.div [
             prop.style [ style.marginTop 20 ]
@@ -139,7 +199,7 @@ let createFilter generics indications routes dispatch =
     [ 
         { Components.Autocomplete.props with
             Dispatch = SelectGeneric >> dispatch
-            Options = generics |> Array.toList
+            Options = generics 
             Label = sprintf "Zoek een generiek (van %i totaal)" (generics |> Array.length)
             Filter = Filter.StartsWith 
         }
@@ -149,7 +209,7 @@ let createFilter generics indications routes dispatch =
         
         { Components.Autocomplete.props with
             Dispatch = SelectIndication >> dispatch
-            Options = indications |> Array.toList
+            Options = indications 
             Label = sprintf "Kies een indicatie (van %i totaal)" (indications |> Array.length)
             Filter = Filter.ContainsCaseSensitive 
         }
@@ -157,71 +217,73 @@ let createFilter generics indications routes dispatch =
         |> toDiv
 
         { Components.Autocomplete.props with
+                Dispatch = SelectShape >> dispatch
+                Options = shapes
+                Label = sprintf "Kies een vorm (van %i totaal)" (shapes |> Array.length)
+                Filter = Filter.StartsWith
+        }
+        |> Components.Autocomplete.render 
+        |> toDiv
+
+        { Components.Autocomplete.props with
                 Dispatch = SelectRoute >> dispatch
-                Options = routes |> Array.toList
+                Options = routes
                 Label = sprintf "Kies een route (van %i totaal)" (routes |> Array.length)
                 Filter = Filter.StartsWith
         }
         |> Components.Autocomplete.render 
         |> toDiv
 
-        (*
-        match routes with
-        | Resolved routes ->
-            Html.div [ 
-                prop.style [ style.marginTop 20 ]
-                prop.children [ 
-                    { Autocomplete.props with
-                            Dispatch = SelectRoute >> dispatch
-                            Options = routes |> List.sort
-                            Label = sprintf "Kies een route (van %i totaal)" (routes |> List.length)
-                            Filter = Filter.StartsWith }
-                    |> Autocomplete.render 
-                ] 
-            ]
-        | _ -> ()
+        { Components.Autocomplete.props with
+            Dispatch = SelectPatient >> dispatch
+            Options = patients |> Array.distinct
+            Label = sprintf "Kies een patient (van %i totaal)" (patients |> Array.length)
+            Filter = Filter.StartsWith 
+        }
+        |> Components.Autocomplete.render 
+        |> toDiv
 
-        match patients with
-        | Resolved pats ->
-            Html.div [ 
-                prop.style [ style.marginTop 20 ]
-                prop.children [ 
-                    { Autocomplete.props with
-                        Dispatch = SelectPatient >> dispatch
-                        Options = pats
-                        Label = sprintf "Kies een patient (van %i totaal)" (pats |> List.length)
-                        Filter = Filter.StartsWith }
-                    |> Autocomplete.render 
-                ] 
-            ]
-        | _ -> () 
-        *)
+    
+        if diagnoses |> Array.length >= 1 then
+            { Components.Autocomplete.props with
+                Dispatch = SelectDiagnosis >> dispatch
+                Options = diagnoses |> Array.distinct 
+                Label = sprintf "Kies een diagnose (van %i totaal)" (diagnoses |> Array.length)
+                Filter = Filter.StartsWith 
+            }
+            |> Components.Autocomplete.render 
+            |> toDiv
     ]
 
 
 let render (state: State) (dispatch: Msg -> unit) =
     let toMarkDown s = 
-        printfn $"to markdown: {s}"
         s
         |> markdown.children
         |> List.singleton
-        |> List.append [ markdown.escapeHtml false ]
         |> Markdown.markdown
 
     let titleBar = 
-        [ Fable.MaterialUI.Icons.menuIcon "", fun () -> () ]
-        |> Components.TitleBar.render "Generieke Pediatrisch Formularium"
+        [ 
+            Fable.MaterialUI.Icons.menuIcon "", fun () -> () 
+            Fable.MaterialUI.Icons.refreshIcon "", (fun () -> Refresh |> dispatch)
+        ]
+        |> Components.TitleBar.render "Generiek Pediatrisch Formularium"
 
     let mainWindow =
         match state.Query with
-        | HasNotStartedYet -> "## De boel moet nog worden opgestart" |> toMarkDown
-        | InProgress  -> "## Formularium wordt geladen" |> toMarkDown
+        | HasNotStartedYet 
+        | InProgress  -> 
+            Mui.circularProgress [  ]
         | Resolved qry ->
             let filter = 
                 createFilter 
                     qry.Generics 
                     qry.Indications 
+                    qry.Shapes
                     qry.Routes
+                    qry.Patients
+                    qry.Diagnoses
                     dispatch
 
             Html.div [

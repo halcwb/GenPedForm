@@ -15,12 +15,15 @@ module ServerApi =
     let runQuery = 
         fun qry ->
             [
-                qry.Filter.Indication
-                qry.Filter.Generic
-                qry.Filter.Shape
-                qry.Filter.Route
-                qry.Filter.Patient.Diagnosis
+                "refresh", qry.Refresh |> string |> Some
+                "indication", qry.Filter.Indication
+                "generic", qry.Filter.Generic
+                "shape", qry.Filter.Shape
+                "route", qry.Filter.Route
+                "patient", qry.Filter.PatientString
+                "diagnoses", qry.Filter.Patient.Diagnosis
             ]
+            |> List.map (fun (k, v) -> v |> Option.map (sprintf "%s: %s" k))
             |> List.choose id
             |> String.concat ", "
             |> printfn "running qry: %s"
@@ -28,7 +31,7 @@ module ServerApi =
             async {
                 return 
                     qry
-                    |> Query.run
+                    |> Query.run qry.Refresh
             }
 
 
@@ -36,6 +39,7 @@ module ServerApi =
         {
             Query = runQuery
         }
+
 
 let tryGetEnv key = 
     match Env.environmentVars().TryGetValue(key) with

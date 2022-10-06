@@ -11,8 +11,6 @@
     <Compile Include="Utils.fs" />
     <Compile Include="Bindings.fs" />
     <Compile Include="Server.fs" />
-    <Compile Include="Components\NumberInput.fs" />
-    <Compile Include="Components\MultiSelect.fs" />
     <Compile Include="Components\Autocomplete.fs" />
     <Compile Include="Components\TitleBar.fs" />
     <Compile Include="App.fs" />

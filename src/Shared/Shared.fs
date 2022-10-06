@@ -24,12 +24,14 @@ module Types =
             Shape : string option
             Route : string option
             Department : string option
+            PatientString : string option
             Patient : Patient
         }
 
 
     type Query =
         {
+            Refresh : bool
             Filter : Filter
             Indications : string []
             Generics : string []
@@ -71,12 +73,14 @@ module Query =
             Shape = None
             Route = None
             Department = None
+            PatientString = None
             Patient = patient
         }
 
 
     let query =
         {
+            Refresh = false
             Filter = filter
             Indications = Array.empty
             Generics = Array.empty

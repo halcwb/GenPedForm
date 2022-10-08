@@ -16,6 +16,7 @@ module ServerApi =
         fun qry ->
             [
                 "refresh", qry.Refresh |> string |> Some
+                "view", Some $"{qry.ShowMd}"
                 "indication", qry.Filter.Indication
                 "generic", qry.Filter.Generic
                 "shape", qry.Filter.Shape

@@ -221,7 +221,7 @@ NUGET
     Hopac (0.5.1)
       FSharp.Core (>= 4.5.2)
     Iced (1.17)
-    Informedica.GenForm.Lib (1.1.1)
+    Informedica.GenForm.Lib (1.2.4)
       FParsec (>= 1.1.1)
       FSharp.Core (>= 6.0.5)
       Informedica.Utils.Lib (>= 1.0.4)

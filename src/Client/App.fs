@@ -21,6 +21,7 @@ type State =
 
 
 type Msg =
+    | SwitchView 
     | RunQuery of AsyncOperationStatus<Result<Query, string>>
     | SelectGeneric of string
     | SelectIndication of string
@@ -77,6 +78,21 @@ let update (msg: Msg) (state: State): State * Cmd<Msg> =
     | RunQuery(Finished(Error e)) ->
         printfn "error %s" e
         state, Cmd.none
+
+    | SwitchView ->
+        let cmd = 
+            state.Query
+            |> Deferred.map (fun qry ->
+                { qry with 
+                    ShowMd = 
+                        match qry.ShowMd with
+                        | DoseRuleMd -> SolutionRuleMd
+                        | SolutionRuleMd -> DoseRuleMd
+                }
+            )
+            |>queryCmd
+
+        { state with Query = InProgress }, cmd
 
     | Refresh -> 
         let cmd =
@@ -257,11 +273,6 @@ let createFilter generics indications shapes routes patients diagnoses dispatch 
 
 
 let render (state: State) (dispatch: Msg -> unit) =
-    let toMarkDown s = 
-        s
-        |> markdown.children
-        |> List.singleton
-        |> Markdown.markdown
 
     let titleBar = 
         [ 
@@ -298,11 +309,15 @@ let render (state: State) (dispatch: Msg -> unit) =
                         style.padding 10
                         style.color Colors.indigo.``900`` 
                     ]
-
-                    qry.Markdown
-                    |> Array.toList
-                    |> List.map toMarkDown
-                    |> prop.children 
+                    prop.onDoubleClick (fun _ -> SwitchView |> dispatch)
+                    
+                    paper.children [
+                        Markdown.markdown [
+                                qry.Markdown
+                                |> String.concat "\n"
+                                |> markdown.children
+                        ]
+                    ]
                 ]
             ]
 

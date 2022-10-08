@@ -10,10 +10,13 @@ open Informedica.Utils.Lib
 open Informedica.Utils.Lib.BCL
 
 type DoseRule = Informedica.GenForm.Lib.Types.DoseRule
+type SolutionRule = Informedica.GenForm.Lib.Types.SolutionRule
+
 type GenFormFilter = Informedica.GenForm.Lib.Types.Filter
 
 module Patient = Informedica.GenForm.Lib.Patient
 module DoseRule = Informedica.GenForm.Lib.DoseRule
+module SolutionRule = Informedica.GenForm.Lib.SolutionRule
 
 
 module Memoization =
@@ -54,10 +57,17 @@ let getDoseRules =
     Memoization.memoizeWithRefresh DoseRule.doseRules
 
 
+let getSolutionRules =
+    Memoization.memoizeWithRefresh SolutionRule.getRules
+
+
 let run refresh (qry : Query)  =
     try
         let doseRules =
             getDoseRules refresh ()
+
+        let solutionRules =
+            getSolutionRules refresh ()
 
         qry.Filter 
         |> mapFilterToGenForm
@@ -97,7 +107,18 @@ let run refresh (qry : Query)  =
                     |> Array.filter (String.isNullOrWhiteSpace >> not)
                     |> Array.distinct
                     |> Array.sort
-                Markdown = rs |> DoseRule.printGenerics
+                Markdown =
+                    if qry.Filter.Generic |> Option.isNone then [||]
+                    else 
+                        match qry.ShowMd with
+                        | DoseRuleMd -> rs |> DoseRule.printGenerics
+                        | SolutionRuleMd ->
+                            solutionRules
+                            |> Array.filter (fun sr ->
+                                Some sr.Selector.Generic = qry.Filter.Generic &&
+                                Some sr.Selector.Shape = qry.Filter.Shape
+                            )
+                            |> SolutionRule.printGenerics
             }
         |> Ok
     with 

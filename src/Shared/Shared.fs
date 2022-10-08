@@ -29,9 +29,13 @@ module Types =
         }
 
 
+    type ShowMd = DoseRuleMd | SolutionRuleMd
+
+
     type Query =
         {
             Refresh : bool
+            ShowMd : ShowMd
             Filter : Filter
             Indications : string []
             Generics : string []
@@ -81,6 +85,7 @@ module Query =
     let query =
         {
             Refresh = false
+            ShowMd = DoseRuleMd
             Filter = filter
             Indications = Array.empty
             Generics = Array.empty
